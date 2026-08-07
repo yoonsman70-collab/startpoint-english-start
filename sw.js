@@ -2,14 +2,15 @@
 // 앱을 한 번 방문하면 필요한 파일들을 저장해뒀다가,
 // 인터넷이 안 되는 상황에서도 앱이 열리도록 도와줍니다.
 
-const CACHE_NAME = 'bibby-start-v1';
+const CACHE_NAME = 'bibby-start-v2';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './assets/bibby-hero.png'
+  './assets/bibby-hero.png',
+  './assets/bibby-face.png'
 ];
 
 // 설치 시: 기본 파일들을 미리 저장
