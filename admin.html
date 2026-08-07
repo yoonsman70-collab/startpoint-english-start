@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시작점 AI 영어 - 관리자</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Jua&display=swap');
+    body {
+        font-family: 'Nunito', sans-serif;
+        background-color: #F9F6F0;
+        color: #5E4B3C;
+        margin: 0;
+    }
+    .brand-title { font-family: 'Jua', sans-serif; }
+    .card {
+        background: #FFFFFF;
+        border-radius: 20px;
+        box-shadow: 0 2px 12px rgba(94, 75, 60, 0.08);
+    }
+    .btn {
+        border-radius: 12px;
+        font-weight: 800;
+        transition: transform 0.1s;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary { background: #89A8B2; color: white; }
+    .btn-primary:hover { background: #7A97A1; }
+    .btn-danger { background: #E88C7D; color: white; }
+    .btn-danger:hover { background: #DB7A6A; }
+    .btn-outline { background: white; border: 2px solid #D8C3A5; color: #8B7355; }
+    .btn-outline:hover { background: #F2EAE1; }
+    input {
+        border: 2px solid #E4DACB;
+        border-radius: 12px;
+        padding: 10px 14px;
+        outline: none;
+    }
+    input:focus { border-color: #89A8B2; }
+    .badge { border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 800; }
+    .badge-locked { background: #FBE1DC; color: #C1503E; }
+    .badge-active { background: #E3EEE1; color: #4B8A5A; }
+    table { border-collapse: separate; border-spacing: 0; }
+    th { text-align: left; font-size: 13px; color: #A0937D; padding: 10px 12px; border-bottom: 2px solid #F2EAE1; }
+    td { padding: 12px; border-bottom: 1px solid #F2EAE1; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- 로그인 화면 -->
+<div id="login-screen" class="min-h-screen flex items-center justify-center px-4">
+    <div class="card p-8 w-full max-w-sm">
+        <h1 class="brand-title text-2xl text-center mb-1">시작점 AI 영어</h1>
+        <p class="text-center text-sm text-[#A0937D] mb-6">관리자 로그인</p>
+        <div class="space-y-3">
+            <input id="admin-username" type="text" placeholder="관리자 아이디" class="w-full" autocomplete="username">
+            <input id="admin-password" type="password" placeholder="비밀번호" class="w-full" autocomplete="current-password"
+                onkeydown="if(event.key==='Enter') adminLogin()">
+            <button onclick="adminLogin()" class="btn btn-primary w-full py-3">로그인</button>
+            <p id="login-error" class="text-center text-sm font-bold text-red-500 min-h-[20px]"></p>
+        </div>
+    </div>
+</div>
+
+<!-- 관리자 대시보드 화면 -->
+<div id="dashboard-screen" class="hidden max-w-5xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-8">
+        <div>
+            <h1 class="brand-title text-2xl">시작점 AI 영어 - 관리자</h1>
+            <p class="text-sm text-[#A0937D]" id="admin-welcome"></p>
+        </div>
+        <button onclick="adminLogout()" class="btn btn-outline px-4 py-2 text-sm">로그아웃</button>
+    </div>
+
+    <!-- 학생 추가 폼 -->
+    <div class="card p-6 mb-6">
+        <h2 class="font-extrabold text-lg mb-4">새 학생 계정 추가</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-3">
+            <input id="new-username" type="text" placeholder="아이디 (예: minjun01)">
+            <input id="new-password" type="text" placeholder="비밀번호">
+            <input id="new-display-name" type="text" placeholder="학생 이름">
+            <input id="new-class-name" type="text" placeholder="반 이름 (선택)">
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="createStudent()" class="btn btn-primary px-5 py-2.5">계정 추가</button>
+            <button onclick="fillRandomPassword()" class="btn btn-outline px-4 py-2.5 text-sm">비밀번호 자동생성</button>
+            <p id="create-error" class="text-sm font-bold text-red-500"></p>
+            <p id="create-success" class="text-sm font-bold text-green-600"></p>
+        </div>
+    </div>
+
+    <!-- 학생 목록 -->
+    <div class="card p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-extrabold text-lg">학생 목록</h2>
+            <button onclick="loadUsers()" class="text-sm text-[#89A8B2] font-bold">↻ 새로고침</button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th>이름</th>
+                        <th>아이디</th>
+                        <th>반</th>
+                        <th>상태</th>
+                        <th>마지막 로그인</th>
+                        <th>관리</th>
+                    </tr>
+                </thead>
+                <tbody id="user-table-body"></tbody>
+            </table>
+            <p id="user-list-empty" class="text-center text-[#A0937D] py-8 hidden">아직 등록된 학생이 없어요.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    let adminUser = null;
+
+    async function checkAdminSession() {
+        try {
+            const res = await fetch('/api/me', { credentials: 'same-origin' });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.ok && data.user.role === 'admin') {
+                    adminUser = data.user;
+                    showDashboard();
+                    return;
+                }
+            }
+        } catch (e) { /* 무시 */ }
+        showLogin();
+    }
+
+    function showLogin() {
+        document.getElementById('login-screen').classList.remove('hidden');
+        document.getElementById('dashboard-screen').classList.add('hidden');
+    }
+
+    function showDashboard() {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('dashboard-screen').classList.remove('hidden');
+        document.getElementById('admin-welcome').innerText = `${adminUser.display_name}님, 환영합니다`;
+        loadUsers();
+    }
+
+    async function adminLogin() {
+        const username = document.getElementById('admin-username').value.trim();
+        const password = document.getElementById('admin-password').value;
+        const errorEl = document.getElementById('login-error');
+        errorEl.innerText = '';
+
+        if (!username || !password) {
+            errorEl.innerText = '아이디와 비밀번호를 입력해주세요.';
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+
+            if (!data.ok) {
+                errorEl.innerText = data.error || '로그인에 실패했어요.';
+                return;
+            }
+            if (data.user.role !== 'admin') {
+                errorEl.innerText = '관리자 계정이 아니에요.';
+                await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+                return;
+            }
+
+            adminUser = data.user;
+            showDashboard();
+        } catch (e) {
+            errorEl.innerText = '연결에 문제가 있어요. 잠시 후 다시 시도해주세요.';
+        }
+    }
+
+    async function adminLogout() {
+        try {
+            await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+        } catch (e) { /* 무시 */ }
+        adminUser = null;
+        showLogin();
+    }
+
+    async function loadUsers() {
+        try {
+            const res = await fetch('/api/admin/list-users', { credentials: 'same-origin' });
+            const data = await res.json();
+            if (!data.ok) return;
+
+            const tbody = document.getElementById('user-table-body');
+            const emptyMsg = document.getElementById('user-list-empty');
+            tbody.innerHTML = '';
+
+            const students = data.users.filter(u => u.role !== 'admin');
+
+            if (students.length === 0) {
+                emptyMsg.classList.remove('hidden');
+                return;
+            }
+            emptyMsg.classList.add('hidden');
+
+            students.forEach(u => {
+                const tr = document.createElement('tr');
+                const lastLogin = u.last_login_at ? new Date(u.last_login_at).toLocaleDateString('ko-KR') : '-';
+                const statusBadge = u.is_locked
+                    ? `<span class="badge badge-locked">잠김</span>`
+                    : `<span class="badge badge-active">정상</span>`;
+
+                tr.innerHTML = `
+                    <td class="font-bold">${escapeHtml(u.display_name)}</td>
+                    <td class="text-[#A0937D]">${escapeHtml(u.username)}</td>
+                    <td>${escapeHtml(u.class_name || '-')}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-[#A0937D]">${lastLogin}</td>
+                    <td>
+                        <div class="flex gap-2">
+                            ${u.is_locked ? `<button onclick="unlockUser(${u.id})" class="btn btn-outline px-3 py-1.5 text-xs">잠금해제</button>` : ''}
+                            <button onclick="resetPassword(${u.id}, '${escapeHtml(u.display_name)}')" class="btn btn-outline px-3 py-1.5 text-xs">비밀번호 재설정</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error('학생 목록 불러오기 실패:', e);
+        }
+    }
+
+    function fillRandomPassword() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        let pw = '';
+        for (let i = 0; i < 8; i++) pw += chars[Math.floor(Math.random() * chars.length)];
+        document.getElementById('new-password').value = pw;
+    }
+
+    async function createStudent() {
+        const username = document.getElementById('new-username').value.trim();
+        const password = document.getElementById('new-password').value;
+        const display_name = document.getElementById('new-display-name').value.trim();
+        const class_name = document.getElementById('new-class-name').value.trim();
+        const errorEl = document.getElementById('create-error');
+        const successEl = document.getElementById('create-success');
+        errorEl.innerText = '';
+        successEl.innerText = '';
+
+        if (!username || !password || !display_name) {
+            errorEl.innerText = '아이디, 비밀번호, 이름은 꼭 입력해주세요.';
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/admin/create-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ username, password, display_name, class_name })
+            });
+            const data = await res.json();
+
+            if (!data.ok) {
+                errorEl.innerText = data.error || '계정 생성에 실패했어요.';
+                return;
+            }
+
+            successEl.innerText = `${display_name} 학생 계정이 만들어졌어요! (아이디: ${username})`;
+            document.getElementById('new-username').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('new-display-name').value = '';
+            document.getElementById('new-class-name').value = '';
+            loadUsers();
+        } catch (e) {
+            errorEl.innerText = '연결에 문제가 있어요. 잠시 후 다시 시도해주세요.';
+        }
+    }
+
+    async function unlockUser(userId) {
+        if (!confirm('이 학생의 계정 잠금을 해제할까요?')) return;
+        try {
+            const res = await fetch('/api/admin/unlock-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ user_id: userId })
+            });
+            const data = await res.json();
+            if (data.ok) loadUsers();
+            else alert(data.error || '잠금 해제에 실패했어요.');
+        } catch (e) {
+            alert('연결에 문제가 있어요.');
+        }
+    }
+
+    async function resetPassword(userId, name) {
+        const newPassword = prompt(`${name} 학생의 새 비밀번호를 입력해주세요:`);
+        if (!newPassword) return;
+
+        try {
+            const res = await fetch('/api/admin/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ user_id: userId, new_password: newPassword })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                alert(`비밀번호가 재설정됐어요! (새 비밀번호: ${newPassword})\n학생에게 전달해주세요.`);
+                loadUsers();
+            } else {
+                alert(data.error || '비밀번호 재설정에 실패했어요.');
+            }
+        } catch (e) {
+            alert('연결에 문제가 있어요.');
+        }
+    }
+
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    checkAdminSession();
+</script>
+</body>
+</html>
