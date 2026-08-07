@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>초등영어패턴-스타트</title>
+
+    <!-- PWA 설정: 앱처럼 설치되고 실행되게 해주는 태그들 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#D8C3A5">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="비비 영어">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <link rel="icon" href="icons/icon-192.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Jua&display=swap');
+        
+        body {
+            font-family: 'Jua', 'Nunito', sans-serif;
+            background-color: #F9F6F0; 
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            touch-action: manipulation;
+            color: #5E4B3C; 
+        }
+
+        .mobile-frame {
+            width: 100%;
+            max-width: 390px;
+            height: 100vh;
+            max-height: 844px;
+            background-color: #F2EAE1; 
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(94, 75, 60, 0.2);
+        }
+
+        @media (min-width: 640px) {
+            .mobile-frame {
+                height: 844px;
+                border-radius: 45px;
+                border: 8px solid #FFFFFF;
+            }
+        }
+
+        .clay-card {
+            background-color: #F2EAE1;
+            border-radius: 32px;
+            box-shadow: 
+                8px 8px 16px #D4C9BE, 
+                -8px -8px 16px #FFFFFF,
+                inset 2px 2px 5px rgba(255, 255, 255, 0.6),
+                inset -3px -3px 6px rgba(180, 165, 150, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+        }
+
+        .clay-btn {
+            background-color: #D8C3A5; 
+            border-radius: 24px;
+            color: #5E4B3C;
+            box-shadow: 
+                6px 6px 12px #D4C9BE, 
+                -6px -6px 12px #FFFFFF,
+                inset 2px 2px 4px rgba(255, 255, 255, 0.5),
+                inset -2px -2px 5px rgba(139, 115, 85, 0.2);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .clay-btn:active:not(:disabled) {
+            transform: scale(0.95);
+            box-shadow: 
+                inset 4px 4px 8px #C2AF92,
+                inset -4px -4px 8px rgba(255, 255, 255, 0.6);
+        }
+
+        .clay-btn-blue {
+            background-color: #A8C8D9; 
+            color: #365063;
+            box-shadow: 
+                6px 6px 12px #D4C9BE, 
+                -6px -6px 12px #FFFFFF,
+                inset 2px 2px 4px rgba(255, 255, 255, 0.5),
+                inset -2px -2px 5px rgba(82, 114, 133, 0.2);
+        }
+        
+        .clay-btn-blue:active:not(:disabled) {
+            transform: scale(0.95);
+            box-shadow: 
+                inset 4px 4px 8px #96B5C5,
+                inset -4px -4px 8px rgba(255, 255, 255, 0.6);
+        }
+
+        .character-focus {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            transform: scale(1.1); /* 새 이미지에 맞게 확대 비율 조정 */
+        }
+
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn { 0% { opacity: 0; transform: scale(0.8); } 70% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 0.6; } 100% { transform: scale(1.6); opacity: 0; } }
+
+        .animate-fade-up { animation: fadeUp 0.5s ease-out forwards; }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        .animate-pop-in { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+
+        /* 수정 1: h-full 대신 min-height와 flex 활용하여 오버플로우 겹침 현상 방지 */
+        .step-container { display: none; flex-direction: column; width: 100%; min-height: 100%; }
+        .step-container.active { display: flex; }
+
+        .star-fill { transition: color 0.3s ease, transform 0.3s ease; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
+        .star-filled { color: #FFB347; transform: scale(1.2); }
+        
+        ::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="mobile-frame">
+        <div id="header" class="pt-12 pb-4 px-6 flex flex-col z-20 absolute top-0 w-full" style="background: linear-gradient(180deg, #F2EAE1 80%, rgba(242, 234, 225, 0) 100%); pointer-events: none;">
+            <div class="flex items-center justify-between h-8 pointer-events-auto">
+                <button onclick="goHome()" id="home-btn" class="text-[#8B7355] font-bold text-2xl hidden active:scale-90 transition-transform">
+                    ⬅️
+                </button>
+                <div class="flex-1 text-center font-bold text-[#5E4B3C] text-xl tracking-wide" id="header-title">
+                    초등영어패턴-스타트
+                </div>
+                <div class="w-8"></div>
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto overflow-x-hidden pt-24 pb-6 px-6 relative" id="main-content">
+
+            <!-- Step 1: 환영 화면 -->
+            <div id="step-1" class="step-container active animate-fade-in justify-between pb-4">
+                <div class="flex flex-col items-center mt-6">
+                    <div class="w-48 h-48 rounded-full overflow-hidden flex items-center justify-center mb-8 animate-float clay-card border-4 border-white z-10 relative">
+                        <!-- 새 캐릭터 이미지로 교체 -->
+                        <img src="assets/bibby-hero.png" alt="BIBBY" class="character-focus">
+                    </div>
+
+                    <div class="clay-card px-6 py-8 w-full max-w-[320px] relative mt-[-2rem] pt-12">
+                        <p class="text-center text-[#5E4B3C] text-xl leading-relaxed whitespace-pre-line">
+                            안녕! 난 너의 AI 영어 친구 
+                            <span class="text-[#A07855] font-extrabold text-2xl">BIBBY(비비)</span>야!
+                            오늘부터 나랑 같이
+                            <span class="text-[#89A8B2] font-extrabold">핵심 패턴</span>을 연습해보자!
+                        </p>
+                    </div>
+                </div>
+
+                <div class="w-full mt-10 mb-4">
+                    <button onclick="nextStep(2)" class="clay-btn clay-btn-blue w-full flex items-center justify-center py-5">
+                        <span class="text-2xl tracking-wide">시작하기 🚀</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: 패턴 선택 화면 (겹침 버그 픽스를 위해 h-full 제거, padding 조정) -->
+            <div id="step-2" class="step-container animate-fade-up">
+                <h2 class="text-3xl font-extrabold text-[#5E4B3C] mb-2 mt-4 text-center">
+                    오늘 배울 패턴
+                </h2>
+                <p class="text-[#A07855] text-center text-lg mb-6">원하는 패턴을 선택하고 학습해봐!</p>
+
+                <!-- 패턴 리스트가 길어져도 겹치지 않고 자연스럽게 스크롤됩니다. -->
+                <div id="pattern-list" class="flex flex-col gap-4 pb-12">
+                    <!-- JS로 30개 패턴 렌더링 -->
+                </div>
+            </div>
+
+            <!-- Step 3: 학습 및 마이크 녹음 화면 -->
+            <div id="step-3" class="step-container animate-fade-in flex-col pb-4 h-full">
+                
+                <div class="flex justify-between items-center mb-6 mt-2">
+                    <span class="text-[#8B7355] text-lg px-4 py-2 clay-card font-bold" id="sentence-counter">
+                        문장 1 / 10
+                    </span>
+                    <button onclick="playTTS()" class="w-12 h-12 clay-btn flex justify-center items-center text-2xl">
+                        🔊
+                    </button>
+                </div>
+
+                <div class="clay-card p-6 w-full mb-8 flex flex-col items-center relative mt-2">
+                    <div class="absolute -top-4 clay-btn-blue px-5 py-2 font-bold text-lg" id="current-pattern-badge">
+                        I am ~
+                    </div>
+                    
+                    <h3 class="text-3xl text-[#5E4B3C] text-center mt-6 mb-4 leading-tight min-h-[5rem] flex items-center justify-center w-full" id="display-sentence-eng" style="font-family: 'Nunito', sans-serif; font-weight: 800;">
+                        I am happy.
+                    </h3>
+                    <div class="w-20 h-1 bg-[#D8C3A5] rounded-full mb-5"></div>
+                    <p class="text-[#8B7355] text-center text-xl min-h-[2.5rem]" id="display-sentence-kor">
+                        나는 행복해.
+                    </p>
+                </div>
+
+                <div class="flex flex-col items-center flex-1">
+                    <p class="text-lg text-[#A07855] mb-4 font-bold" id="instruction-text">비비의 발음을 듣고 3번 따라해봐!</p>
+                    <div class="flex gap-4 text-5xl text-[#D4C9BE] mb-6">
+                        <span id="star-1" class="star-fill">★</span>
+                        <span id="star-2" class="star-fill">★</span>
+                        <span id="star-3" class="star-fill">★</span>
+                    </div>
+
+                    <!-- 마이크 버튼 영역 -->
+                    <div class="relative flex flex-col items-center justify-center mt-auto mb-8">
+                        <div id="mic-pulse" class="absolute w-32 h-32 bg-[#D8C3A5] rounded-full opacity-0 pointer-events-none"></div>
+                        
+                        <button id="mic-btn" onclick="toggleRecording()" class="relative z-10 w-24 h-24 clay-btn flex items-center justify-center mb-4 transition-colors">
+                            <span class="text-4xl" id="mic-icon">🎤</span>
+                        </button>
+                        <p id="mic-status" class="text-[#8B7355] font-bold text-lg h-6 transition-opacity text-center w-full min-w-[250px] opacity-100">
+                            마이크를 누르고 말해보세요!
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: 상세 평가 및 녹음 다시 듣기 화면 -->
+            <div id="step-4" class="step-container flex-col items-center h-full animate-pop-in relative pb-4">
+                
+                <div class="w-24 h-24 rounded-full overflow-hidden flex items-center justify-center mb-4 animate-float clay-card border-4 border-white z-10 mt-4">
+                    <!-- 새 캐릭터 이미지로 교체 -->
+                    <img src="캡처11.PNG" alt="BIBBY" class="character-focus">
+                </div>
+
+                <h2 class="text-2xl font-black text-[#5E4B3C] text-center mb-4 z-10">
+                    학습 완료 및 평가
+                </h2>
+
+                <div class="clay-card p-4 w-full mb-4 z-10 bg-white">
+                    <span class="text-sm text-[#365063] bg-[#A8C8D9] px-3 py-1 rounded-full mb-2 inline-block font-bold">비비의 피드백 💬</span>
+                    <p class="text-[#5E4B3C] text-base leading-relaxed mt-1 font-bold" id="eval-tip">
+                        정말 잘했어! 억양과 발음이 아주 자연스러워!
+                    </p>
+                </div>
+
+                <!-- 상세 평가표 및 다시 듣기 영역 -->
+                <div id="evaluation-list" class="w-full flex-1 overflow-y-auto mb-4 px-1 rounded-xl">
+                    <!-- JS로 평가 리스트 렌더링 -->
+                </div>
+
+                <button onclick="goHome()" class="clay-btn w-full flex items-center justify-center py-4 mt-auto">
+                    <span class="text-xl font-bold">다른 패턴 배우기</span>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // 30개 패턴과 300개 문장 데이터 (전체 데이터 추가 완료)
+        const patternData = [
+            { id: 1, title: "Day 1: I am ~", desc: "나는 ~야", icon: "😊", sentences: [{eng:"I am happy.",kor:"나는 행복해."},{eng:"I am a student.",kor:"나는 학생이야."},{eng:"I am tired.",kor:"나는 피곤해."},{eng:"I am hungry.",kor:"나는 배고파."},{eng:"I am ready.",kor:"나는 준비됐어."},{eng:"I am sorry.",kor:"나는 미안해."},{eng:"I am here.",kor:"나는 여기 있어."},{eng:"I am late.",kor:"나는 늦었어."},{eng:"I am excited.",kor:"나는 신나."},{eng:"I am ten years old.",kor:"나는 열 살이야."}]},
+            { id: 2, title: "Day 2: I like ~", desc: "나는 ~를 좋아해", icon: "❤️", sentences: [{eng:"I like pizza.",kor:"나는 피자를 좋아해."},{eng:"I like dogs.",kor:"나는 강아지를 좋아해."},{eng:"I like music.",kor:"나는 음악을 좋아해."},{eng:"I like summer.",kor:"나는 여름을 좋아해."},{eng:"I like my teacher.",kor:"나는 우리 선생님을 좋아해."},{eng:"I like games.",kor:"나는 게임을 좋아해."},{eng:"I like ice cream.",kor:"나는 아이스크림을 좋아해."},{eng:"I like reading books.",kor:"나는 책 읽는 것을 좋아해."},{eng:"I like my friends.",kor:"나는 내 친구들을 좋아해."},{eng:"I like weekends.",kor:"나는 주말을 좋아해."}]},
+            { id: 3, title: "Day 3: I have ~", desc: "나는 ~를 가지고 있어", icon: "🎒", sentences: [{eng:"I have a pencil.",kor:"나는 연필이 있어."},{eng:"I have a cat.",kor:"나는 고양이가 있어."},{eng:"I have two brothers.",kor:"나는 남동생이 두 명 있어."},{eng:"I have a new bag.",kor:"나는 새 가방이 있어."},{eng:"I have homework today.",kor:"나는 오늘 숙제가 있어."},{eng:"I have a question.",kor:"나는 질문이 있어."},{eng:"I have an idea.",kor:"나는 아이디어가 있어."},{eng:"I have a headache.",kor:"나는 두통이 있어."},{eng:"I have some money.",kor:"나는 돈이 좀 있어."},{eng:"I have a soccer ball.",kor:"나는 축구공이 있어."}]},
+            { id: 4, title: "Day 4: I want ~", desc: "나는 ~를 원해", icon: "⭐", sentences: [{eng:"I want water.",kor:"나는 물을 원해."},{eng:"I want a break.",kor:"나는 쉬고 싶어."},{eng:"I want a new phone.",kor:"나는 새 폰을 원해."},{eng:"I want candy.",kor:"나는 사탕을 원해."},{eng:"I want that toy.",kor:"나는 저 장난감을 원해."},{eng:"I want more time.",kor:"나는 시간이 더 필요해."},{eng:"I want a puppy.",kor:"나는 강아지를 원해."},{eng:"I want your help.",kor:"나는 네 도움이 필요해."},{eng:"I want a snack.",kor:"나는 간식을 원해."},{eng:"I want a good grade.",kor:"나는 좋은 성적을 원해."}]},
+            { id: 5, title: "Day 5: This is ~", desc: "이것은 ~야", icon: "☝️", sentences: [{eng:"This is my book.",kor:"이것은 내 책이야."},{eng:"This is fun.",kor:"이것은 재밌어."},{eng:"This is my dog.",kor:"이것은 내 강아지야."},{eng:"This is easy.",kor:"이것은 쉬워."},{eng:"This is my room.",kor:"이것은 내 방이야."},{eng:"This is delicious.",kor:"이것은 맛있어."},{eng:"This is a secret.",kor:"이것은 비밀이야."},{eng:"This is important.",kor:"이것은 중요해."},{eng:"This is my favorite song.",kor:"이것은 내가 제일 좋아하는 노래야."},{eng:"This is too hard.",kor:"이것은 너무 어려워."}]},
+            { id: 6, title: "Day 6: That is ~", desc: "저것은 ~야", icon: "👉", sentences: [{eng:"That is my house.",kor:"저것은 우리 집이야."},{eng:"That is scary.",kor:"저것은 무서워."},{eng:"That is cool.",kor:"저것은 멋있어."},{eng:"That is my teacher.",kor:"저분은 우리 선생님이야."},{eng:"That is a big tree.",kor:"저것은 큰 나무야."},{eng:"That is not true.",kor:"저것은 사실이 아니야."},{eng:"That is weird.",kor:"저것은 이상해."},{eng:"That is my seat.",kor:"저것은 내 자리야."},{eng:"That is a good idea.",kor:"저것은 좋은 생각이야."},{eng:"That is too expensive.",kor:"저것은 너무 비싸."}]},
+            { id: 7, title: "Day 7: It is ~", desc: "그것은 ~야 / (날씨,시간)", icon: "🌤️", sentences: [{eng:"It is raining.",kor:"비가 와."},{eng:"It is cold today.",kor:"오늘은 추워."},{eng:"It is my birthday.",kor:"오늘은 내 생일이야."},{eng:"It is time for lunch.",kor:"점심 시간이야."},{eng:"It is Monday.",kor:"월요일이야."},{eng:"It is too loud.",kor:"너무 시끄러워."},{eng:"It is a good day.",kor:"좋은 날이야."},{eng:"It is nine o'clock.",kor:"아홉 시야."},{eng:"It is your turn.",kor:"네 차례야."},{eng:"It is not fair.",kor:"그건 불공평해."}]},
+            { id: 8, title: "Day 8: I don't like ~", desc: "나는 ~를 싫어해", icon: "🙅", sentences: [{eng:"I don't like spiders.",kor:"나는 거미를 싫어해."},{eng:"I don't like homework.",kor:"나는 숙제를 싫어해."},{eng:"I don't like waiting.",kor:"나는 기다리는 걸 싫어해."},{eng:"I don't like broccoli.",kor:"나는 브로콜리를 싫어해."},{eng:"I don't like losing.",kor:"나는 지는 걸 싫어해."},{eng:"I don't like the rain.",kor:"나는 비를 싫어해."},{eng:"I don't like loud noises.",kor:"나는 시끄러운 소리를 싫어해."},{eng:"I don't like being alone.",kor:"나는 혼자 있는 걸 싫어해."},{eng:"I don't like tests.",kor:"나는 시험을 싫어해."},{eng:"I don't like this song.",kor:"나는 이 노래를 싫어해."}]},
+            { id: 9, title: "Day 9: Can I ~?", desc: "내가 ~해도 될까?", icon: "🙋", sentences: [{eng:"Can I go home?",kor:"집에 가도 될까요?"},{eng:"Can I have some water?",kor:"물 좀 마셔도 될까요?"},{eng:"Can I ask a question?",kor:"질문해도 될까요?"},{eng:"Can I play outside?",kor:"밖에서 놀아도 될까요?"},{eng:"Can I use your pencil?",kor:"네 연필 써도 될까?"},{eng:"Can I sit here?",kor:"여기 앉아도 될까요?"},{eng:"Can I go to the bathroom?",kor:"화장실 가도 될까요?"},{eng:"Can I try again?",kor:"다시 해봐도 될까요?"},{eng:"Can I borrow your book?",kor:"네 책 빌려도 될까?"},{eng:"Can I open the window?",kor:"창문 열어도 될까요?"}]},
+            { id: 10, title: "Day 10: I can ~", desc: "나는 ~할 수 있어", icon: "💪", sentences: [{eng:"I can swim.",kor:"나는 수영할 수 있어."},{eng:"I can ride a bike.",kor:"나는 자전거를 탈 수 있어."},{eng:"I can speak English.",kor:"나는 영어를 할 수 있어."},{eng:"I can jump high.",kor:"나는 높이 뛸 수 있어."},{eng:"I can help you.",kor:"나는 너를 도와줄 수 있어."},{eng:"I can do it.",kor:"나는 할 수 있어."},{eng:"I can sing well.",kor:"나는 노래를 잘할 수 있어."},{eng:"I can run fast.",kor:"나는 빨리 달릴 수 있어."},{eng:"I can read this book.",kor:"나는 이 책을 읽을 수 있어."},{eng:"I can cook rice.",kor:"나는 밥을 할 수 있어."}]},
+            { id: 11, title: "Day 11: I can't ~", desc: "나는 ~할 수 없어", icon: "💦", sentences: [{eng:"I can't sleep.",kor:"나는 잠을 잘 수 없어."},{eng:"I can't find my shoes.",kor:"나는 신발을 찾을 수 없어."},{eng:"I can't hear you.",kor:"나는 네 말이 안 들려."},{eng:"I can't wait!",kor:"너무 기대돼!"},{eng:"I can't do this alone.",kor:"나는 이걸 혼자 할 수 없어."},{eng:"I can't remember.",kor:"나는 기억이 안 나."},{eng:"I can't stop laughing.",kor:"나는 웃음을 멈출 수 없어."},{eng:"I can't come today.",kor:"나는 오늘 못 가."},{eng:"I can't open this.",kor:"나는 이걸 열 수 없어."},{eng:"I can't believe it!",kor:"믿을 수가 없어!"}]},
+            { id: 12, title: "Day 12: Where is ~?", desc: "~는 어디에 있어?", icon: "🗺️", sentences: [{eng:"Where is my bag?",kor:"내 가방 어디 있어?"},{eng:"Where is the bathroom?",kor:"화장실이 어디예요?"},{eng:"Where is your house?",kor:"네 집은 어디야?"},{eng:"Where is my phone?",kor:"내 폰 어디 있지?"},{eng:"Where is the library?",kor:"도서관이 어디예요?"},{eng:"Where is mom?",kor:"엄마 어디 계셔?"},{eng:"Where is my pencil case?",kor:"내 필통 어디 있어?"},{eng:"Where is the exit?",kor:"출구가 어디예요?"},{eng:"Where is my dog?",kor:"우리 강아지 어디 있지?"},{eng:"Where is the nearest store?",kor:"가장 가까운 가게가 어디예요?"}]},
+            { id: 13, title: "Day 13: What is ~?", desc: "~는 뭐야?", icon: "❓", sentences: [{eng:"What is this?",kor:"이게 뭐야?"},{eng:"What is your name?",kor:"네 이름이 뭐야?"},{eng:"What is that sound?",kor:"저 소리는 뭐야?"},{eng:"What is your favorite color?",kor:"네가 제일 좋아하는 색이 뭐야?"},{eng:"What is the answer?",kor:"답이 뭐야?"},{eng:"What is wrong?",kor:"뭐가 잘못됐어?"},{eng:"What is the plan?",kor:"계획이 뭐야?"},{eng:"What is your phone number?",kor:"네 전화번호가 뭐야?"},{eng:"What is the homework?",kor:"숙제가 뭐야?"},{eng:"What is your dream?",kor:"네 꿈이 뭐야?"}]},
+            { id: 14, title: "Day 14: How many ~?", desc: "몇 개의 ~?", icon: "🔢", sentences: [{eng:"How many apples do you have?",kor:"사과 몇 개 있어?"},{eng:"How many students are there?",kor:"학생이 몇 명 있어?"},{eng:"How many pencils do you need?",kor:"연필 몇 개 필요해?"},{eng:"How many books did you read?",kor:"책 몇 권 읽었어?"},{eng:"How many cookies are left?",kor:"쿠키가 몇 개 남았어?"},{eng:"How many people are coming?",kor:"몇 명이 와?"},{eng:"How many pets do you have?",kor:"반려동물이 몇 마리 있어?"},{eng:"How many days until vacation?",kor:"방학까지 며칠 남았어?"},{eng:"How many cups do we need?",kor:"컵이 몇 개 필요해?"},{eng:"How many languages do you speak?",kor:"몇 개 언어를 할 수 있어?"}]},
+            { id: 15, title: "Day 15: I need ~", desc: "나는 ~가 필요해", icon: "🆘", sentences: [{eng:"I need help.",kor:"나는 도움이 필요해."},{eng:"I need a pencil.",kor:"나는 연필이 필요해."},{eng:"I need more time.",kor:"나는 시간이 더 필요해."},{eng:"I need water.",kor:"나는 물이 필요해."},{eng:"I need a break.",kor:"나는 쉬는 시간이 필요해."},{eng:"I need your advice.",kor:"나는 네 조언이 필요해."},{eng:"I need a new bag.",kor:"나는 새 가방이 필요해."},{eng:"I need to go now.",kor:"나는 지금 가야 해."},{eng:"I need some sleep.",kor:"나는 잠이 좀 필요해."},{eng:"I need your phone number.",kor:"나는 네 전화번호가 필요해."}]},
+            { id: 16, title: "Day 16: Let's ~", desc: "~하자", icon: "🤝", sentences: [{eng:"Let's go.",kor:"가자."},{eng:"Let's play together.",kor:"같이 놀자."},{eng:"Let's eat lunch.",kor:"점심 먹자."},{eng:"Let's study English.",kor:"영어 공부하자."},{eng:"Let's clean the room.",kor:"방 청소하자."},{eng:"Let's watch a movie.",kor:"영화 보자."},{eng:"Let's take a break.",kor:"좀 쉬자."},{eng:"Let's try again.",kor:"다시 해보자."},{eng:"Let's go home.",kor:"집에 가자."},{eng:"Let's sing together.",kor:"같이 노래하자."}]},
+            { id: 17, title: "Day 17: I'm not ~", desc: "나는 ~가 아니야", icon: "🛑", sentences: [{eng:"I'm not sure.",kor:"나는 잘 모르겠어."},{eng:"I'm not hungry.",kor:"나는 배고프지 않아."},{eng:"I'm not ready yet.",kor:"나는 아직 준비 안 됐어."},{eng:"I'm not tired.",kor:"나는 피곤하지 않아."},{eng:"I'm not afraid.",kor:"나는 무섭지 않아."},{eng:"I'm not angry.",kor:"나는 화나지 않았어."},{eng:"I'm not from here.",kor:"나는 여기 출신이 아니야."},{eng:"I'm not good at math.",kor:"나는 수학을 잘 못해."},{eng:"I'm not joking.",kor:"나는 농담하는 게 아니야."},{eng:"I'm not busy today.",kor:"나는 오늘 바쁘지 않아."}]},
+            { id: 18, title: "Day 18: Do you like ~?", desc: "너는 ~를 좋아해?", icon: "🤔", sentences: [{eng:"Do you like coffee?",kor:"너 커피 좋아해?"},{eng:"Do you like dogs?",kor:"너 강아지 좋아해?"},{eng:"Do you like school?",kor:"너 학교 좋아해?"},{eng:"Do you like this song?",kor:"너 이 노래 좋아해?"},{eng:"Do you like sports?",kor:"너 운동 좋아해?"},{eng:"Do you like spicy food?",kor:"너 매운 음식 좋아해?"},{eng:"Do you like winter?",kor:"너 겨울 좋아해?"},{eng:"Do you like reading?",kor:"너 독서 좋아해?"},{eng:"Do you like my new shoes?",kor:"내 새 신발 어때. 좋아?"},{eng:"Do you like your teacher?",kor:"너 선생님 좋아해?"}]},
+            { id: 19, title: "Day 19: I feel ~", desc: "나는 ~한 기분이야", icon: "💖", sentences: [{eng:"I feel great.",kor:"나는 기분이 좋아."},{eng:"I feel sick.",kor:"나는 몸이 안 좋아."},{eng:"I feel nervous.",kor:"나는 긴장돼."},{eng:"I feel sleepy.",kor:"나는 졸려."},{eng:"I feel proud.",kor:"나는 자랑스러워."},{eng:"I feel happy today.",kor:"나는 오늘 행복해."},{eng:"I feel sad.",kor:"나는 슬퍼."},{eng:"I feel better now.",kor:"나는 이제 괜찮아졌어."},{eng:"I feel a little scared.",kor:"나는 좀 무서워."},{eng:"I feel bored.",kor:"나는 심심해."}]},
+            { id: 20, title: "Day 20: There is ~", desc: "~가 있어(단수)", icon: "🏠", sentences: [{eng:"There is a cat outside.",kor:"밖에 고양이가 있어."},{eng:"There is a book on the desk.",kor:"책상 위에 책이 있어."},{eng:"There is a problem.",kor:"문제가 있어."},{eng:"There is a park near my house.",kor:"우리 집 근처에 공원이 있어."},{eng:"There is no time.",kor:"시간이 없어."},{eng:"There is a spider in my room.",kor:"내 방에 거미가 있어."},{eng:"There is a party tonight.",kor:"오늘 밤 파티가 있어."},{eng:"There is a mistake here.",kor:"여기 실수가 있어."},{eng:"There is a new student.",kor:"새로운 학생이 있어."},{eng:"There is nothing to do.",kor:"할 게 아무것도 없어."}]},
+            { id: 21, title: "Day 21: There are ~", desc: "~들이 있어(복수)", icon: "🌳", sentences: [{eng:"There are many students.",kor:"학생들이 많아."},{eng:"There are three books.",kor:"책이 세권 있어."},{eng:"There are dogs in the park.",kor:"공원에 강아지들이 있어."},{eng:"There are no more cookies.",kor:"쿠키가 더 이상 없어."},{eng:"There are many colors.",kor:"색깔이 많아."},{eng:"There are two doors.",kor:"문이 두 개 있어."},{eng:"There are lots of stars tonight.",kor:"오늘 밤 별이 많아."},{eng:"There are five apples.",kor:"사과가 다섯 개 있어."},{eng:"There are many people here.",kor:"여기 사람이 많아."},{eng:"There are some questions.",kor:"질문이 좀 있어."}]},
+            { id: 22, title: "Day 22: I see ~", desc: "나는 ~를 봐", icon: "👀", sentences: [{eng:"I see a bird.",kor:"나는 새를 봐."},{eng:"I see you!",kor:"너 보인다!"},{eng:"I see a rainbow.",kor:"나는 무지개를 봐."},{eng:"I see the problem now.",kor:"이제 문제가 뭔지 알겠어."},{eng:"I see a car outside.",kor:"밖에 차가 보여."},{eng:"I see many stars.",kor:"별이 많이 보여."},{eng:"I see.",kor:"알겠어."},{eng:"I see my friend.",kor:"내 친구가 보여."},{eng:"I see a mistake.",kor:"실수가 보여."},{eng:"I see the school bus.",kor:"스쿨버스가 보여."}]},
+            { id: 23, title: "Day 23: I hear ~", desc: "나는 ~를 들어", icon: "👂", sentences: [{eng:"I hear music.",kor:"음악 소리가 들려."},{eng:"I hear a strange noise.",kor:"이상한 소리가 들려."},{eng:"I hear you.",kor:"네 말 들려."},{eng:"I hear the rain.",kor:"비 오는 소리가 들려."},{eng:"I hear a dog barking.",kor:"강아지 짖는 소리가 들려."},{eng:"I hear my mom calling.",kor:"엄마가 부르는 소리가 들려."},{eng:"I hear a bird singing.",kor:"새 우는 소리가 들려."},{eng:"I hear something outside.",kor:"밖에서 뭔가 소리가 들려."},{eng:"I hear the bell.",kor:"종소리가 들려."},{eng:"I hear you loud and clear.",kor:"잘 들려."}]},
+            { id: 24, title: "Day 24: I'm ~ years old", desc: "나는 ~살이야", icon: "🎂", sentences: [{eng:"I'm ten years old.",kor:"나는 열 살이야."},{eng:"I'm twelve years old.",kor:"나는 열두 살이야."},{eng:"I'm eight years old.",kor:"나는 여덟 살이야."},{eng:"I'm eleven years old.",kor:"나는 열한 살이야."},{eng:"I'm nine years old.",kor:"나는 아홉 살이야."},{eng:"I'm thirteen years old.",kor:"나는 열세 살이야."},{eng:"I'm seven years old.",kor:"나는 일곱 살이야."},{eng:"I'm fourteen years old.",kor:"나는 열네 살이야."},{eng:"I'm six years old.",kor:"나는 여섯 살이야."},{eng:"I'm fifteen years old.",kor:"나는 열다섯 살이야."}]},
+            { id: 25, title: "Day 25: It's time to ~", desc: "~할 시간이야", icon: "⏰", sentences: [{eng:"It's time to go.",kor:"갈 시간이야."},{eng:"It's time to eat.",kor:"밥 먹을 시간이야."},{eng:"It's time for bed.",kor:"잘 시간이야."},{eng:"It's time to study.",kor:"공부할 시간이야."},{eng:"It's time to wake up.",kor:"일어날 시간이야."},{eng:"It's time to go home.",kor:"집에 갈 시간이야."},{eng:"It's time for school.",kor:"학교 갈 시간이야."},{eng:"It's time to clean up.",kor:"정리할 시간이야."},{eng:"It's time to leave.",kor:"떠날 시간이야."},{eng:"It's time to say goodbye.",kor:"작별 인사할 시간이야."}]},
+            { id: 26, title: "Day 26: I go to ~", desc: "나는 ~에 가", icon: "🏃", sentences: [{eng:"I go to school every day.",kor:"나는 매일 학교에 가."},{eng:"I go to bed at nine.",kor:"나는 아홉 시에 자."},{eng:"I go to the library on weekends.",kor:"나는 주말에 도서관에 가."},{eng:"I go to church on Sundays.",kor:"나는 일요일마다 교회에 가."},{eng:"I go to my grandma's house.",kor:"나는 할머니 댁에 가."},{eng:"I go to the park after school.",kor:"나는 방과 후에 공원에 가."},{eng:"I go to English class on Mondays.",kor:"나는 월요일마다 영어 수업에 가."},{eng:"I go to the store with my mom.",kor:"나는 엄마와 가게에 가."},{eng:"I go to bed early.",kor:"나는 일찍 자."},{eng:"I go to school by bus.",kor:"나는 버스로 학교에 가."}]},
+            { id: 27, title: "Day 27: I play ~", desc: "나는 ~를 해/놀아", icon: "⚽", sentences: [{eng:"I play soccer.",kor:"나는 축구를 해."},{eng:"I play the piano.",kor:"나는 피아노를 쳐."},{eng:"I play with my friends.",kor:"나는 친구들과 놀아."},{eng:"I play games after school.",kor:"나는 방과 후에 게임을 해."},{eng:"I play basketball on weekends.",kor:"나는 주말에 농구를 해."},{eng:"I play with my dog.",kor:"나는 강아지랑 놀아."},{eng:"I play the guitar.",kor:"나는 기타를 쳐."},{eng:"I play outside every day.",kor:"나는 매일 밖에서 놀아."},{eng:"I play badminton with my dad.",kor:"나는 아빠랑 배드민턴을 쳐."},{eng:"I play video games at home.",kor:"나는 집에서 비디오 게임을 해."}]},
+            { id: 28, title: "Day 28: Is this ~?", desc: "이것은 ~야?", icon: "🧐", sentences: [{eng:"Is this yours?",kor:"이거 네 거야?"},{eng:"Is this right?",kor:"이거 맞아?"},{eng:"Is this your bag?",kor:"이거 네 가방이야?"},{eng:"Is this free?",kor:"이거 공짜야?"},{eng:"Is this the way to school?",kor:"이 길이 학교 가는 길이야?"},{eng:"Is this a good idea?",kor:"이게 좋은 생각이야?"},{eng:"Is this too hard for you?",kor:"이거 너한테 너무 어려워?"},{eng:"Is this your favorite book?",kor:"이게 네가 제일 좋아하는 책이야?"},{eng:"Is this okay?",kor:"이거 괜찮아?"},{eng:"Is this seat empty?",kor:"이 자리 비어있어요?"}]},
+            { id: 29, title: "Day 29: What time is it?", desc: "몇 시야?", icon: "⌚", sentences: [{eng:"What time is it now?",kor:"지금 몇 시야?"},{eng:"What time is it in Korea?",kor:"한국은 몇 시야?"},{eng:"What time is it there?",kor:"거기는 몇 시야?"},{eng:"What time is it, do you know?",kor:"몇 시인지 알아?"},{eng:"What time is it in New York?",kor:"뉴욕은 몇 시야?"},{eng:"What time is it back home?",kor:"고향은 몇 시야?"},{eng:"What time is it exactly?",kor:"정확히 몇 시야?"},{eng:"What time is it on your watch?",kor:"네 시계로 몇 시야?"},{eng:"What time is it, class?",kor:"얘들아, 몇 시야?"},{eng:"What time is it already?",kor:"벌써 몇 시야?"}]},
+            { id: 30, title: "Day 30: I'm good at ~", desc: "나는 ~를 잘해", icon: "🏅", sentences: [{eng:"I'm good at math.",kor:"나는 수학을 잘해."},{eng:"I'm good at drawing.",kor:"나는 그림을 잘 그려."},{eng:"I'm good at soccer.",kor:"나는 축구를 잘해."},{eng:"I'm good at singing.",kor:"나는 노래를 잘해."},{eng:"I'm good at English.",kor:"나는 영어를 잘해."},{eng:"I'm good at swimming.",kor:"나는 수영을 잘해."},{eng:"I'm good at making friends.",kor:"나는 친구를 잘 사귀어."},{eng:"I'm good at cooking.",kor:"나는 요리를 잘해."},{eng:"I'm good at remembering things.",kor:"나는 기억을 잘해."},{eng:"I'm good at dancing.",kor:"나는 춤을 잘 춰."}]}
+        ];
+
+        // 학습 진행 상태 변수들
+        let currentStep = 1;
+        let selectedPattern = null;
+        let currentSentenceIndex = 0;
+        let repeatCount = 0; 
+        let sessionStats = []; // 평가를 위한 시도 횟수 및 오디오 URL 저장
+
+        // 음성 인식 및 녹음용 변수
+        let recognition = null;
+        let isRecording = false;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let currentAudioUrl = null;
+
+        // UI 이동 로직
+        function nextStep(step) {
+            document.querySelectorAll('.step-container').forEach(el => el.classList.remove('active'));
+            document.getElementById(`step-${step}`).classList.add('active');
+            currentStep = step;
+
+            const homeBtn = document.getElementById('home-btn');
+            const headerTitle = document.getElementById('header-title');
+
+            if (step === 1) {
+                homeBtn.classList.add('hidden');
+                headerTitle.innerText = "초등영어패턴-스타트";
+            } else if (step === 2) {
+                homeBtn.classList.remove('hidden');
+                headerTitle.innerText = "패턴 선택";
+                renderPatternList();
+            } else if (step === 3) {
+                homeBtn.classList.remove('hidden');
+                headerTitle.innerText = "학습 중...";
+                initSpeechRecognition(); // 음성 인식 초기화
+                startLearningSession();
+            } else if (step === 4) {
+                homeBtn.classList.add('hidden');
+                headerTitle.innerText = "학습 결과";
+                renderEvaluation();
+            }
+            
+            // Step2로 이동시 스크롤 최상단으로
+            if(step === 2) {
+                document.getElementById('main-content').scrollTop = 0;
+            }
+        }
+
+        function goHome() {
+            window.speechSynthesis.cancel();
+            selectedPattern = null;
+            sessionStats = [];
+            if(mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
+            nextStep(2);
+        }
+
+        function renderPatternList() {
+            const container = document.getElementById('pattern-list');
+            container.innerHTML = ''; 
+
+            patternData.forEach(pattern => {
+                const btn = document.createElement('button');
+                btn.className = "w-full py-5 px-6 clay-card flex flex-col items-start transition-transform active:scale-95";
+                btn.onclick = () => selectPattern(pattern);
+                
+                btn.innerHTML = `
+                    <div class="flex items-center w-full mb-2">
+                        <span class="text-3xl mr-3">${pattern.icon}</span>
+                        <span class="text-2xl font-bold text-[#5E4B3C]" style="font-family: 'Nunito', sans-serif;">${pattern.title}</span>
+                    </div>
+                    <span class="text-[#8B7355] text-lg mt-1 font-bold">${pattern.desc}</span>
+                    <span class="text-sm bg-[#D8C3A5] text-[#5E4B3C] px-3 py-1 rounded-full mt-3 font-bold">총 ${pattern.sentences.length}문장</span>
+                `;
+                container.appendChild(btn);
+            });
+        }
+
+        function selectPattern(pattern) {
+            selectedPattern = pattern;
+            currentSentenceIndex = 0;
+            sessionStats = []; // 기록 초기화
+            nextStep(3);
+        }
+
+        function startLearningSession() {
+            document.getElementById('current-pattern-badge').innerText = selectedPattern.title;
+            loadSentence();
+        }
+
+        function loadSentence() {
+            repeatCount = 0;
+            updateLearningUI();
+            updateStatusText("먼저 비비의 발음을 잘 들어보세요!", "#A07855");
+            
+            // 문장 진입 시 통계 데이터 초기 셋팅
+            if (!sessionStats[currentSentenceIndex]) {
+                sessionStats[currentSentenceIndex] = { attempts: 0, audioUrl: null };
+            }
+
+            setTimeout(() => {
+                playTTS();
+                setTimeout(() => {
+                    updateStatusText("마이크를 누르고 따라 말해보세요!", "#8B7355");
+                }, 1500);
+            }, 500);
+        }
+
+        function updateLearningUI() {
+            const sentence = selectedPattern.sentences[currentSentenceIndex];
+            document.getElementById('display-sentence-eng').innerText = sentence.eng;
+            document.getElementById('display-sentence-kor').innerText = sentence.kor;
+            
+            document.getElementById('sentence-counter').innerText = 
+                `문장 ${currentSentenceIndex + 1} / ${selectedPattern.sentences.length}`;
+
+            // 별 채우기 업데이트
+            for (let i = 1; i <= 3; i++) {
+                const star = document.getElementById(`star-${i}`);
+                if (i <= repeatCount) {
+                    star.classList.add('star-filled');
+                    star.classList.remove('text-[#D4C9BE]');
+                } else {
+                    star.classList.remove('star-filled');
+                    star.classList.add('text-[#D4C9BE]');
+                }
+            }
+        }
+
+        function playTTS() {
+            if (!selectedPattern) return;
+            const text = selectedPattern.sentences[currentSentenceIndex].eng;
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.85; 
+            
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function updateStatusText(text, color) {
+            const statusEl = document.getElementById('mic-status');
+            const instructionEl = document.getElementById('instruction-text');
+            statusEl.innerText = text;
+            statusEl.style.color = color;
+            instructionEl.innerText = text;
+        }
+
+        function initSpeechRecognition() {
+            window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (window.SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.lang = 'en-US';
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
+                
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    console.log("인식된 문장:", transcript);
+                    checkPronunciation(transcript);
+                };
+                
+                recognition.onerror = (event) => {
+                    console.error("음성 인식 에러:", event.error);
+                    stopRecordingUI();
+                    
+                    // 에러 종류에 따른 친절한 피드백 메시지 제공
+                    if (event.error === 'no-speech') {
+                        updateStatusText("목소리가 안 들렸어요! 다시 눌러서 크게 말해볼까요?", "#E74C3C");
+                    } else if (event.error === 'not-allowed') {
+                        updateStatusText("마이크 권한이 없어요. 브라우저 설정을 확인해주세요!", "#E74C3C");
+                    } else {
+                        updateStatusText("잘 못 들었어요. 버튼을 다시 눌러주세요.", "#E74C3C");
+                    }
+                };
+                
+                recognition.onend = () => {
+                    if (isRecording) {
+                        stopRecordingUI();
+                        // 일정 시간이 지나 자동으로 꺼진 경우, 기본 안내 멘트로 복귀
+                        setTimeout(() => {
+                            if (!isRecording && document.getElementById('mic-status').innerText.includes("듣고 있어요")) {
+                                updateStatusText("마이크를 누르고 말해보세요!", "#8B7355");
+                            }
+                        }, 500);
+                    }
+                };
+            } else {
+                console.warn("이 브라우저는 Web Speech API를 지원하지 않습니다. 시뮬레이션 모드로 작동합니다.");
+            }
+        }
+
+        async function toggleRecording() {
+            if (isRecording) {
+                // 사용자가 마이크 버튼을 한 번 더 누르면 수동으로 인식 중지
+                if (recognition) {
+                    try { recognition.stop(); } catch(e) {}
+                }
+                stopRecordingUI();
+                return;
+            }
+            if (repeatCount >= 3) return;
+
+            try {
+                // 오디오 녹음 스트림 가져오기
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    currentAudioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // 항상 마지막 녹음본을 저장
+                    sessionStats[currentSentenceIndex].audioUrl = currentAudioUrl;
+                };
+
+                // UI 변경
+                const btn = document.getElementById('mic-btn');
+                const icon = document.getElementById('mic-icon');
+                const pulse = document.getElementById('mic-pulse');
+
+                isRecording = true;
+                btn.classList.add('listening');
+                btn.style.backgroundColor = '#FFB347'; 
+                icon.innerText = '🎙️';
+                
+                pulse.classList.add('animate-[pulse-ring_1.5s_cubic-bezier(0.215,0.61,0.355,1)_infinite]');
+                pulse.style.backgroundColor = '#FFB347';
+                
+                updateStatusText("듣고 있어요... 쫑긋!", "#D35400");
+
+                // 녹음 및 인식 시작
+                mediaRecorder.start();
+                if (recognition) {
+                    try {
+                        recognition.start();
+                    } catch(e) {
+                        // 이미 시작된 경우 무시
+                    }
+                } else {
+                    // Speech API 미지원 환경에서의 Fallback (시뮬레이션 모드 제거)
+                    setTimeout(() => {
+                        stopRecordingUI();
+                        alert("마이크 인식을 지원하지 않는 환경입니다. 크롬 브라우저를 사용해주세요.");
+                    }, 2000);
+                }
+
+                // 시도 횟수 증가
+                sessionStats[currentSentenceIndex].attempts++;
+
+            } catch (err) {
+                console.error("마이크 접근 거부:", err);
+                alert("학습을 위해 마이크 권한을 허용해주세요!");
+            }
+        }
+
+        function stopRecordingUI() {
+            isRecording = false;
+            
+            const btn = document.getElementById('mic-btn');
+            const icon = document.getElementById('mic-icon');
+            const pulse = document.getElementById('mic-pulse');
+
+            btn.classList.remove('listening');
+            btn.style.backgroundColor = ''; 
+            icon.innerText = '🎤';
+            pulse.classList.remove('animate-[pulse-ring_1.5s_cubic-bezier(0.215,0.61,0.355,1)_infinite]');
+            pulse.style.backgroundColor = '';
+            
+            if(mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+            }
+        }
+
+        function checkPronunciation(transcript) {
+            const targetText = selectedPattern.sentences[currentSentenceIndex].eng;
+            
+            // 단순화를 위한 텍스트 정규화 (소문자화 및 특수문자 제거)
+            const cleanTarget = targetText.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+            const cleanTranscript = transcript.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+            
+            // 단어 단위 매칭도 검사
+            const targetWords = cleanTarget.split(' ');
+            const transcriptWords = cleanTranscript.split(' ');
+            let matchCount = 0;
+            targetWords.forEach(word => {
+                if(transcriptWords.includes(word)) matchCount++;
+            });
+            
+            // 정확도 기준을 75%로 상향 (이전: 50%)
+            const accuracy = matchCount / targetWords.length;
+            const isExactMatch = cleanTranscript.includes(cleanTarget);
+            
+            console.log(`[발음 평가] 목표: ${cleanTarget} / 인식: ${cleanTranscript} / 정확도: ${accuracy}`);
+
+            if (accuracy >= 0.75 || isExactMatch) { 
+                // 성공 로직
+                updateStatusText("참 잘했어요! 완벽해요!", "#27AE60");
+                repeatCount++;
+                updateLearningUI();
+
+                setTimeout(() => {
+                    if (repeatCount < 3) {
+                        updateStatusText("한 번 더! 듣고 따라해봐요.", "#8B7355");
+                        playTTS();
+                    } else {
+                        updateStatusText("최고예요! 다음 문장으로 갑니다.", "#2980B9");
+                        setTimeout(nextSentence, 1500);
+                    }
+                }, 1500);
+            } else {
+                // 실패 로직 (사용자가 말한 내용을 텍스트로 보여주며 피드백)
+                updateStatusText(`아쉬워요! "${transcript}"라고 들렸어요.`, "#E74C3C");
+                setTimeout(() => {
+                    updateStatusText("마이크를 누르고 다시 또박또박 시도해봐요!", "#8B7355");
+                    playTTS();
+                }, 2500);
+            }
+        }
+
+        function nextSentence() {
+            currentSentenceIndex++;
+            if (currentSentenceIndex < selectedPattern.sentences.length) {
+                loadSentence();
+            } else {
+                nextStep(4);
+            }
+        }
+
+        function renderEvaluation() {
+            const evalList = document.getElementById('evaluation-list');
+            evalList.innerHTML = ''; 
+            
+            let totalAttempts = 0;
+            const totalSentences = selectedPattern.sentences.length;
+
+            selectedPattern.sentences.forEach((sentence, idx) => {
+                const stat = sessionStats[idx] || { attempts: 3, audioUrl: null };
+                totalAttempts += stat.attempts;
+                
+                // 각 문장별 시도 횟수 기반 피드백 뱃지
+                let badgeHtml = '';
+                if (stat.attempts === 3) badgeHtml = `<span class="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-md font-bold">Excellent</span>`;
+                else if (stat.attempts <= 5) badgeHtml = `<span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-md font-bold">Good</span>`;
+                else badgeHtml = `<span class="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-md font-bold">Try More</span>`;
+
+                const item = document.createElement('div');
+                item.className = 'clay-card p-4 mb-4 w-full flex justify-between items-center bg-[#FDFBF7]';
+                
+                // 오디오 재생 버튼 활성화 여부
+                const playBtnClass = stat.audioUrl ? 'clay-btn-blue' : 'bg-gray-300 opacity-50 cursor-not-allowed';
+                const playAction = stat.audioUrl ? `onclick="playUserAudio('${stat.audioUrl}')"` : '';
+
+                item.innerHTML = `
+                    <div class="flex-1 pr-3">
+                        <div class="flex items-center gap-2 mb-1">
+                            <p class="font-extrabold text-[#5E4B3C] text-lg">${sentence.eng}</p>
+                            ${badgeHtml}
+                        </div>
+                        <p class="text-sm text-[#8B7355] font-bold mb-1">${sentence.kor}</p>
+                        <p class="text-xs text-[#A07855]">마이크 시도 횟수: ${stat.attempts}번</p>
+                    </div>
+                    <button class="w-14 h-14 ${playBtnClass} rounded-full flex justify-center items-center text-xl shadow-md" ${playAction} title="내 발음 듣기">
+                        ▶️
+                    </button>
+                `;
+                evalList.appendChild(item);
+            });
+            
+            // 종합 피드백 로직
+            const avgAttempts = totalAttempts / totalSentences;
+            let feedbackText = "";
+            
+            if (avgAttempts <= 3.5) {
+                feedbackText = `와! <span class="text-[#A07855]">${selectedPattern.title}</span> 패턴을 한 번도 안 틀리고 원어민처럼 해냈어! 억양과 발음이 완벽해!`;
+            } else if (avgAttempts <= 5) {
+                feedbackText = `정말 잘했어! 몇 번 헷갈린 부분이 있었지만 훌륭해! <br>다음에는 <b>잘 안된 단어에 조금 더 힘을 주어서</b> 또박또박 말해보자!`;
+            } else {
+                feedbackText = `포기하지 않고 끝까지 해낸 모습이 너무 멋져! 👏<br>어려웠던 문장은 오른쪽 <b>재생(▶️) 버튼</b>을 눌러서 내 목소리를 다시 들어보고 비교해봐!`;
+            }
+            
+            document.getElementById('eval-tip').innerHTML = feedbackText;
+        }
+
+        // 사용자가 녹음한 오디오 재생 함수
+        let currentAudioPlayer = null;
+        function playUserAudio(url) {
+            if (!url) return;
+            if (currentAudioPlayer) {
+                currentAudioPlayer.pause();
+                currentAudioPlayer.currentTime = 0;
+            }
+            currentAudioPlayer = new Audio(url);
+            currentAudioPlayer.play().catch(e => {
+                console.error("오디오 재생 실패:", e);
+                alert("녹음된 오디오를 재생할 수 없습니다.");
+            });
+        }
+
+        window.onload = () => {
+            // 브라우저 보이스 로드 준비
+            window.speechSynthesis.getVoices();
+        };
+    </script>
+
+    <!-- 서비스 워커 등록: 이 앱을 PWA(설치 가능한 앱)로 동작하게 해줍니다 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((reg) => console.log('서비스 워커 등록 성공:', reg.scope))
+                    .catch((err) => console.log('서비스 워커 등록 실패:', err));
+            });
+        }
+    </script>
+</body>
+</html>
