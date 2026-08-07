@@ -160,8 +160,31 @@
 
         <div class="flex-1 overflow-y-auto overflow-x-hidden pt-24 pb-6 px-6 relative" id="main-content">
 
+            <!-- Step 0: 로그인 화면 -->
+            <div id="step-0" class="step-container active animate-fade-in flex-col items-center justify-center h-full">
+                <div class="w-32 h-32 rounded-full overflow-hidden flex items-center justify-center mb-6 clay-card border-4 border-white">
+                    <img src="assets/bibby-face.png" alt="BIBBY" class="character-focus">
+                </div>
+                <h2 class="text-xl font-extrabold text-[#5E4B3C] mb-1">로그인해서 시작해요!</h2>
+                <p class="text-sm text-[#A0937D] mb-6">비비와 함께 영어 공부하러 가요</p>
+                <div class="w-full max-w-xs space-y-3">
+                    <input id="login-username" type="text" placeholder="아이디" autocomplete="username"
+                        onkeydown="if(event.key==='Enter') document.getElementById('login-password').focus()"
+                        class="w-full px-4 py-3 rounded-2xl clay-card border-2 border-white text-[#5E4B3C] font-bold text-center focus:outline-none">
+                    <input id="login-password" type="password" placeholder="비밀번호" autocomplete="current-password"
+                        onkeydown="if(event.key==='Enter') handleLogin()"
+                        class="w-full px-4 py-3 rounded-2xl clay-card border-2 border-white text-[#5E4B3C] font-bold text-center focus:outline-none">
+                    <button id="login-btn" onclick="handleLogin()"
+                        class="w-full clay-btn-blue py-3 rounded-2xl font-extrabold text-white transition-transform active:scale-95">
+                        로그인
+                    </button>
+                    <p id="login-error" class="text-center text-sm font-bold text-red-500 min-h-[20px]"></p>
+                </div>
+                <p class="text-xs text-[#A0937D] mt-6 text-center leading-relaxed">아이디와 비밀번호는<br>선생님(원장님)께 받아주세요!</p>
+            </div>
+
             <!-- Step 1: 환영 화면 -->
-            <div id="step-1" class="step-container active animate-fade-in justify-between pb-4">
+            <div id="step-1" class="step-container animate-fade-in justify-between pb-4">
                 <div class="flex flex-col items-center mt-6">
                     <div class="w-48 h-48 rounded-full overflow-hidden flex items-center justify-center mb-8 animate-float clay-card border-4 border-white z-10 relative">
                         <!-- 새 캐릭터 이미지로 교체 -->
@@ -182,6 +205,10 @@
                     <button onclick="nextStep(2)" class="clay-btn clay-btn-blue w-full flex items-center justify-center py-5">
                         <span class="text-2xl tracking-wide">시작하기 🚀</span>
                     </button>
+                    <p class="text-center text-xs text-[#A0937D] mt-3">
+                        <span id="welcome-username"></span>
+                        <a href="#" onclick="handleLogout(); return false;" class="underline">다른 계정으로 로그인</a>
+                    </p>
                 </div>
             </div>
 
@@ -315,6 +342,7 @@
 
         // 학습 진행 상태 변수들
         let currentStep = 1;
+        let currentUser = null; // 로그인한 사용자 정보
         let selectedPattern = null;
         let currentSentenceIndex = 0;
         let repeatCount = 0; 
@@ -387,6 +415,79 @@
 
         // UI 이동 로직
 
+        // ==============================
+        // 로그인 관련 기능
+        // ==============================
+        async function handleLogin() {
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('login-error');
+            const btn = document.getElementById('login-btn');
+
+            errorEl.innerText = '';
+
+            if (!username || !password) {
+                errorEl.innerText = '아이디와 비밀번호를 입력해주세요!';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = '확인 중...';
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (data.ok) {
+                    currentUser = data.user;
+                    document.getElementById('login-password').value = '';
+                    nextStep(1);
+                } else {
+                    errorEl.innerText = data.error || '로그인에 실패했어요.';
+                }
+            } catch (e) {
+                errorEl.innerText = '연결에 문제가 있어요. 잠시 후 다시 시도해주세요.';
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '로그인';
+            }
+        }
+
+        // 이미 로그인되어 있는지(세션이 살아있는지) 앱 처음 켤 때 확인
+        async function checkExistingSession() {
+            try {
+                const res = await fetch('/api/me', { credentials: 'same-origin' });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.ok) {
+                        currentUser = data.user;
+                        nextStep(1);
+                    }
+                }
+            } catch (e) {
+                // 세션 확인 실패 시 그냥 로그인 화면을 유지합니다.
+            }
+        }
+
+        async function handleLogout() {
+            try {
+                await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+            } catch (e) { /* 무시 */ }
+            currentUser = null;
+            selectedPattern = null;
+            sessionStats = [];
+            document.querySelectorAll('.step-container').forEach(el => el.classList.remove('active'));
+            document.getElementById('step-0').classList.add('active');
+            document.getElementById('home-btn').classList.add('hidden');
+        }
+
+        window.addEventListener('DOMContentLoaded', checkExistingSession);
+
         function nextStep(step) {
             document.querySelectorAll('.step-container').forEach(el => el.classList.remove('active'));
             document.getElementById(`step-${step}`).classList.add('active');
@@ -398,6 +499,10 @@
             if (step === 1) {
                 homeBtn.classList.add('hidden');
                 headerTitle.innerText = "초등영어패턴-스타트";
+                const nameEl = document.getElementById('welcome-username');
+                if (nameEl) {
+                    nameEl.innerText = currentUser ? `${currentUser.display_name}님 · ` : '';
+                }
             } else if (step === 2) {
                 homeBtn.classList.remove('hidden');
                 headerTitle.innerText = "패턴 선택";
