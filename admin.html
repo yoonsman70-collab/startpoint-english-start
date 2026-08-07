@@ -113,6 +113,27 @@
             <p id="user-list-empty" class="text-center text-[#A0937D] py-8 hidden">아직 등록된 학생이 없어요.</p>
         </div>
     </div>
+
+    <!-- 단어·패턴 관리 -->
+    <div class="card p-6 mt-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-extrabold text-lg">단어·패턴 관리 <span class="text-sm text-[#A0937D] font-normal">(스타트 단계)</span></h2>
+            <button onclick="loadPatterns()" class="text-sm text-[#89A8B2] font-bold">↻ 새로고침</button>
+        </div>
+
+        <div class="bg-[#F9F6F0] rounded-2xl p-4 mb-4">
+            <p class="text-sm font-bold mb-2">새 패턴 추가</p>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-2">
+                <input id="np-icon" type="text" placeholder="아이콘(이모지)" maxlength="4">
+                <input id="np-text" type="text" placeholder="패턴 문구 (예: I want to ~)" class="sm:col-span-2">
+                <input id="np-desc" type="text" placeholder="한글 설명 (예: 나는 ~하고 싶어)">
+            </div>
+            <button onclick="createPattern()" class="btn btn-primary px-4 py-2 text-sm">패턴 추가</button>
+            <span id="pattern-create-msg" class="text-sm font-bold ml-2"></span>
+        </div>
+
+        <div id="pattern-accordion" class="space-y-3"></div>
+    </div>
 </div>
 
 <script>
@@ -143,6 +164,7 @@
         document.getElementById('dashboard-screen').classList.remove('hidden');
         document.getElementById('admin-welcome').innerText = `${adminUser.display_name}님, 환영합니다`;
         loadUsers();
+        loadPatterns();
     }
 
     async function adminLogin() {
@@ -327,6 +349,227 @@
         return String(str)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+
+    // ==============================
+    // 단어·패턴 관리
+    // ==============================
+    let patternsCache = [];
+    const expandedPatterns = new Set();
+
+    async function loadPatterns() {
+        try {
+            const res = await fetch('/api/patterns?level=start', { credentials: 'same-origin' });
+            const data = await res.json();
+            if (!data.ok) return;
+            patternsCache = data.patterns;
+            renderPatternAccordion();
+        } catch (e) {
+            console.error('패턴 불러오기 실패:', e);
+        }
+    }
+
+    function renderPatternAccordion() {
+        const container = document.getElementById('pattern-accordion');
+        container.innerHTML = '';
+
+        patternsCache.forEach(p => {
+            const isOpen = expandedPatterns.has(p.id);
+            const wrap = document.createElement('div');
+            wrap.className = 'border border-[#F2EAE1] rounded-2xl overflow-hidden';
+
+            const sentenceRows = p.sentences.map(s => `
+                <div class="flex items-center justify-between gap-2 px-4 py-2 border-b border-[#F2EAE1] last:border-b-0">
+                    <div class="text-sm">
+                        <span class="font-bold">${escapeHtml(s.eng)}</span>
+                        <span class="text-[#A0937D]"> — ${escapeHtml(s.kor)}</span>
+                    </div>
+                    <div class="flex gap-2 shrink-0">
+                        <button onclick="editSentence(${s.id}, '${escapeHtml(s.eng).replace(/'/g, "\\'")}', '${escapeHtml(s.kor).replace(/'/g, "\\'")}')" class="btn btn-outline px-2 py-1 text-xs">수정</button>
+                        <button onclick="deleteSentence(${s.id})" class="btn btn-danger px-2 py-1 text-xs">삭제</button>
+                    </div>
+                </div>
+            `).join('');
+
+            wrap.innerHTML = `
+                <button onclick="togglePattern(${p.id})" class="w-full flex items-center justify-between px-4 py-3 bg-[#F9F6F0] text-left">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl">${p.icon}</span>
+                        <div>
+                            <div class="font-extrabold text-sm">${escapeHtml(p.title)}</div>
+                            <div class="text-xs text-[#A0937D]">${escapeHtml(p.desc)} · 문장 ${p.sentences.length}개</div>
+                        </div>
+                    </div>
+                    <span class="text-[#A0937D]">${isOpen ? '▲' : '▼'}</span>
+                </button>
+                <div id="pattern-body-${p.id}" class="${isOpen ? '' : 'hidden'}">
+                    <div class="flex justify-end gap-2 px-4 pt-3">
+                        <button onclick="editPattern(${p.id}, '${escapeHtml(p.icon)}', '${escapeHtml(p.title.replace(/^Day \\d+:\\s*/, '')).replace(/'/g, "\\'")}', '${escapeHtml(p.desc).replace(/'/g, "\\'")}')" class="btn btn-outline px-3 py-1.5 text-xs">패턴 수정</button>
+                        <button onclick="deletePattern(${p.id})" class="btn btn-danger px-3 py-1.5 text-xs">패턴 삭제</button>
+                    </div>
+                    <div class="mt-2">${sentenceRows || '<p class="text-center text-sm text-[#A0937D] py-4">문장이 없어요.</p>'}</div>
+                    <div class="flex gap-2 p-4 bg-[#FCFAF6]">
+                        <input id="new-sentence-eng-${p.id}" type="text" placeholder="영어 문장" class="flex-1 text-sm">
+                        <input id="new-sentence-kor-${p.id}" type="text" placeholder="한글 뜻" class="flex-1 text-sm">
+                        <button onclick="createSentence(${p.id})" class="btn btn-primary px-4 py-2 text-sm shrink-0">문장 추가</button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(wrap);
+        });
+    }
+
+    function togglePattern(id) {
+        if (expandedPatterns.has(id)) expandedPatterns.delete(id);
+        else expandedPatterns.add(id);
+        renderPatternAccordion();
+    }
+
+    async function createPattern() {
+        const icon = document.getElementById('np-icon').value.trim() || '📘';
+        const pattern_text = document.getElementById('np-text').value.trim();
+        const desc_text = document.getElementById('np-desc').value.trim();
+        const msgEl = document.getElementById('pattern-create-msg');
+        msgEl.innerText = '';
+        msgEl.className = 'text-sm font-bold ml-2';
+
+        if (!pattern_text) {
+            msgEl.innerText = '패턴 문구를 입력해주세요.';
+            msgEl.classList.add('text-red-500');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/admin/create-pattern', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ level_code: 'start', pattern_text, desc_text, icon })
+            });
+            const data = await res.json();
+            if (!data.ok) {
+                msgEl.innerText = data.error || '추가에 실패했어요.';
+                msgEl.classList.add('text-red-500');
+                return;
+            }
+            msgEl.innerText = '패턴이 추가됐어요!';
+            msgEl.classList.add('text-green-600');
+            document.getElementById('np-icon').value = '';
+            document.getElementById('np-text').value = '';
+            document.getElementById('np-desc').value = '';
+            loadPatterns();
+        } catch (e) {
+            msgEl.innerText = '연결에 문제가 있어요.';
+            msgEl.classList.add('text-red-500');
+        }
+    }
+
+    async function editPattern(id, currentIcon, currentText, currentDesc) {
+        const icon = prompt('아이콘(이모지)을 입력하세요:', currentIcon);
+        if (icon === null) return;
+        const pattern_text = prompt('패턴 문구를 입력하세요:', currentText);
+        if (pattern_text === null) return;
+        const desc_text = prompt('한글 설명을 입력하세요:', currentDesc);
+        if (desc_text === null) return;
+
+        try {
+            const res = await fetch('/api/admin/update-pattern', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id, pattern_text, desc_text, icon })
+            });
+            const data = await res.json();
+            if (data.ok) loadPatterns();
+            else alert(data.error || '수정에 실패했어요.');
+        } catch (e) {
+            alert('연결에 문제가 있어요.');
+        }
+    }
+
+    async function deletePattern(id) {
+        if (!confirm('이 패턴과 그 안의 모든 문장이 삭제돼요. 계속할까요?')) return;
+        try {
+            const res = await fetch('/api/admin/delete-pattern', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (data.ok) loadPatterns();
+            else alert(data.error || '삭제에 실패했어요.');
+        } catch (e) {
+            alert('연결에 문제가 있어요.');
+        }
+    }
+
+    async function createSentence(patternId) {
+        const engEl = document.getElementById(`new-sentence-eng-${patternId}`);
+        const korEl = document.getElementById(`new-sentence-kor-${patternId}`);
+        const eng_text = engEl.value.trim();
+        const kor_text = korEl.value.trim();
+
+        if (!eng_text || !kor_text) {
+            alert('영어 문장과 한글 뜻을 모두 입력해주세요.');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/admin/create-sentence', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ pattern_id: patternId, eng_text, kor_text })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                expandedPatterns.add(patternId);
+                loadPatterns();
+            } else {
+                alert(data.error || '추가에 실패했어요.');
+            }
+        } catch (e) {
+            alert('연결에 문제가 있어요.');
+        }
+    }
+
+    async function editSentence(id, currentEng, currentKor) {
+        const eng_text = prompt('영어 문장을 입력하세요:', currentEng);
+        if (eng_text === null) return;
+        const kor_text = prompt('한글 뜻을 입력하세요:', currentKor);
+        if (kor_text === null) return;
+
+        try {
+            const res = await fetch('/api/admin/update-sentence', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id, eng_text, kor_text })
+            });
+            const data = await res.json();
+            if (data.ok) loadPatterns();
+            else alert(data.error || '수정에 실패했어요.');
+        } catch (e) {
+            alert('연결에 문제가 있어요.');
+        }
+    }
+
+    async function deleteSentence(id) {
+        if (!confirm('이 문장을 삭제할까요?')) return;
+        try {
+            const res = await fetch('/api/admin/delete-sentence', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (data.ok) loadPatterns();
+            else alert(data.error || '삭제에 실패했어요.');
+        } catch (e) {
+            alert('연결에 문제가 있어요.');
+        }
     }
 
     checkAdminSession();
