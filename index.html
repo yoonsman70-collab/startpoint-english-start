@@ -101,10 +101,10 @@
         }
 
         .character-focus {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            object-position: center 30%;
+            width: 76%;
+            height: 76%;
+            object-fit: contain;
+            object-position: center;
         }
 
         @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -311,8 +311,27 @@
         let mediaRecorder = null;
         let audioChunks = [];
         let currentAudioUrl = null;
+        let micPermissionGranted = false; // 마이크 권한을 미리 받아뒀는지 여부
 
         // UI 이동 로직
+        // 학습 화면에 들어가는 순간 마이크 권한을 미리 받아둡니다.
+        // 이렇게 하면 실제 녹음 버튼을 누를 때는 이미 허락된 상태라
+        // 권한 팝업을 기다리다가 생기는 모바일 브라우저의 인식 실패를 예방할 수 있어요.
+        async function warmUpMicrophone() {
+            if (micPermissionGranted) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // 권한 확인용이므로 스트림은 즉시 반납 (실제 녹음은 버튼 누를 때 새로 받음)
+                stream.getTracks().forEach(track => track.stop());
+                micPermissionGranted = true;
+                console.log("마이크 권한 미리 확보 완료");
+            } catch (err) {
+                micPermissionGranted = false;
+                console.warn("마이크 권한 워밍업 실패:", err);
+                updateStatusText("마이크 권한이 필요해요! 브라우저 설정에서 마이크 허용을 켜주세요.", "#E74C3C");
+            }
+        }
+
         function nextStep(step) {
             document.querySelectorAll('.step-container').forEach(el => el.classList.remove('active'));
             document.getElementById(`step-${step}`).classList.add('active');
@@ -332,6 +351,7 @@
                 homeBtn.classList.remove('hidden');
                 headerTitle.innerText = "학습 중...";
                 initSpeechRecognition(); // 음성 인식 초기화
+                warmUpMicrophone(); // 마이크 권한을 미리 요청 (모바일 마이크 안정성 핵심)
                 startLearningSession();
             } else if (step === 4) {
                 homeBtn.classList.add('hidden');
@@ -463,17 +483,25 @@
                     checkPronunciation(transcript, confidence);
                 };
                 
+                recognition.onstart = () => {
+                    console.log("음성 인식이 실제로 시작됨");
+                };
+
                 recognition.onerror = (event) => {
                     console.error("음성 인식 에러:", event.error);
                     stopRecordingUI();
                     
-                    // 에러 종류에 따른 친절한 피드백 메시지 제공
+                    // 에러 종류에 따른 친절한 피드백 메시지 제공 (괄호 안은 원인 확인용 코드)
                     if (event.error === 'no-speech') {
                         updateStatusText("목소리가 안 들렸어요! 다시 눌러서 크게 말해볼까요?", "#E74C3C");
-                    } else if (event.error === 'not-allowed') {
-                        updateStatusText("마이크 권한이 없어요. 브라우저 설정을 확인해주세요!", "#E74C3C");
+                    } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                        updateStatusText("마이크 권한이 없어요. 브라우저 설정에서 마이크를 허용해주세요! (not-allowed)", "#E74C3C");
+                    } else if (event.error === 'audio-capture') {
+                        updateStatusText("마이크를 찾을 수 없어요. 다른 앱이 마이크를 쓰고 있는지 확인해주세요. (audio-capture)", "#E74C3C");
+                    } else if (event.error === 'network') {
+                        updateStatusText("인터넷 연결을 확인해주세요! (network)", "#E74C3C");
                     } else {
-                        updateStatusText("잘 못 들었어요. 버튼을 다시 눌러주세요.", "#E74C3C");
+                        updateStatusText(`잘 못 들었어요. 버튼을 다시 눌러주세요. (${event.error})`, "#E74C3C");
                     }
                 };
                 
