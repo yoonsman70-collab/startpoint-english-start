@@ -2,7 +2,7 @@
 // 앱을 한 번 방문하면 필요한 파일들을 저장해뒀다가,
 // 인터넷이 안 되는 상황에서도 앱이 열리도록 도와줍니다.
 
-const CACHE_NAME = 'bibby-start-v10';
+const CACHE_NAME = 'bibby-start-v11';
 const APP_SHELL = [
   './',
   './index.html',
@@ -44,6 +44,15 @@ self.addEventListener('fetch', (event) => {
 
   // 외부 CDN(Tailwind, 폰트)이나 API 요청은 캐시하지 않고 그대로 네트워크로
   if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // ⭐ 중요: /api/ 로 시작하는 요청(로그인, 학습기록 저장, 문장 조회 등)은
+  // 서비스워커가 절대 가로채지 않고 브라우저가 직접 처리하게 둡니다.
+  // 캐시 시스템은 원래 GET 요청(정적 파일)을 위한 것이라, 로그인/기록저장 같은
+  // POST 요청까지 캐시 로직을 거치면 요청이 중간에 유실되거나 오래된 응답이
+  // 뒤섞일 수 있습니다. 실제로 학습 기록 일부가 누락된 원인이 이것이었습니다.
+  if (url.pathname.startsWith('/api/')) {
     return;
   }
 

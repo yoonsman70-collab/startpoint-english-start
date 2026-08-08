@@ -570,6 +570,10 @@
                 sessionStats[currentSentenceIndex] = { attempts: 0, audioUrl: null, recorded: false };
             }
 
+            // 비비가 발음을 들려주는 동안에는 마이크 버튼을 눌러도 반응하지 않게 합니다.
+            // (실수로 미리 누르는 경우 문장이 그냥 넘어가버리는 문제 예방)
+            isBusy = true;
+
             if (recognitionSupported) {
                 updateStatusText("먼저 비비의 발음을 잘 들어보세요!", "#A07855");
             } else {
@@ -579,6 +583,7 @@
             setTimeout(() => {
                 playTTS();
                 setTimeout(() => {
+                    isBusy = false;
                     if (recognitionSupported) {
                         updateStatusText("마이크를 누르고 따라 말해보세요!", "#8B7355");
                     } else {
