@@ -730,6 +730,7 @@
             repeatCount++;
             sessionStats[currentSentenceIndex].attempts++;
             updateLearningUI();
+            logAttempt(selectedPattern.sentences[currentSentenceIndex].id, true, null, null, repeatCount >= REQUIRED_REPEATS);
 
             if (repeatCount < REQUIRED_REPEATS) {
                 updateStatusText(`좋아요! (${repeatCount}/${REQUIRED_REPEATS}) 한 번 더 따라 말해볼까요?`, "#27AE60");
@@ -833,6 +834,28 @@
             }
         }
 
+        // 학생의 시도 결과를 서버에 기록합니다. 실패해도 학습 흐름은 막지 않도록
+        // 조용히 처리합니다 (네트워크 문제가 있어도 앱 사용에는 지장 없게).
+        async function logAttempt(sentenceId, isPass, transcript, confidence, completed) {
+            if (!sentenceId) return;
+            try {
+                await fetch('/api/log-attempt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        sentence_id: sentenceId,
+                        is_pass: isPass,
+                        transcript: transcript || null,
+                        confidence: typeof confidence === 'number' ? confidence : null,
+                        completed: !!completed
+                    })
+                });
+            } catch (e) {
+                console.warn('학습 기록 전송 실패(무시하고 계속 진행):', e);
+            }
+        }
+
         function checkPronunciation(transcript, confidence) {
             const targetText = selectedPattern.sentences[currentSentenceIndex].eng;
             
@@ -867,6 +890,7 @@
                 repeatCount++;
                 updateLearningUI();
                 isBusy = false;
+                logAttempt(selectedPattern.sentences[currentSentenceIndex].id, true, transcript, confidence, repeatCount >= REQUIRED_REPEATS);
 
                 if (repeatCount < REQUIRED_REPEATS) {
                     updateStatusText("참 잘했어요! 완벽해요! 한 번 더 따라해볼까요?", "#27AE60");
@@ -885,6 +909,7 @@
             } else {
                 // 실패 로직 (사용자가 말한 내용을 텍스트로 보여주며 피드백)
                 isBusy = false;
+                logAttempt(selectedPattern.sentences[currentSentenceIndex].id, false, transcript, confidence, false);
                 updateStatusText(`아쉬워요! "${transcript}"라고 들렸어요. 다시 또박또박 말해볼까요?`, "#E74C3C");
                 setTimeout(() => {
                     if (repeatCount < REQUIRED_REPEATS) {

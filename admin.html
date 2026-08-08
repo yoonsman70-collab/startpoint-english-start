@@ -245,6 +245,7 @@
                     <td class="text-[#A0937D]">${lastLogin}</td>
                     <td>
                         <div class="flex gap-2">
+                            <button onclick="viewProgress(${u.id}, '${escapeHtml(u.display_name)}')" class="btn btn-primary px-3 py-1.5 text-xs">학습현황</button>
                             ${u.is_locked ? `<button onclick="unlockUser(${u.id})" class="btn btn-outline px-3 py-1.5 text-xs">잠금해제</button>` : ''}
                             <button onclick="resetPassword(${u.id}, '${escapeHtml(u.display_name)}')" class="btn btn-outline px-3 py-1.5 text-xs">비밀번호 재설정</button>
                         </div>
@@ -572,7 +573,93 @@
         }
     }
 
+    async function viewProgress(userId, name) {
+        const modal = document.getElementById('progress-modal');
+        const body = document.getElementById('progress-modal-body');
+        document.getElementById('progress-modal-title').innerText = `${name} 학생의 학습 현황`;
+        body.innerHTML = '<p class="text-center text-[#A0937D] py-8">불러오는 중...</p>';
+        modal.classList.remove('hidden');
+
+        try {
+            const res = await fetch(`/api/admin/student-progress?user_id=${userId}`, { credentials: 'same-origin' });
+            const data = await res.json();
+            if (!data.ok) {
+                body.innerHTML = `<p class="text-center text-red-500 py-8">${escapeHtml(data.error || '불러오기에 실패했어요.')}</p>`;
+                return;
+            }
+
+            const totalSentences = data.byPattern.reduce((sum, p) => sum + p.total_sentences, 0);
+            const totalCompleted = data.byPattern.reduce((sum, p) => sum + p.completed_sentences, 0);
+            const overallPct = totalSentences ? Math.round((totalCompleted / totalSentences) * 100) : 0;
+            const passRate = data.summary.total_attempts
+                ? Math.round((data.summary.pass_attempts / data.summary.total_attempts) * 100)
+                : 0;
+
+            let html = `
+                <div class="bg-[#F9F6F0] rounded-2xl p-4 mb-4 flex gap-6">
+                    <div>
+                        <div class="text-2xl font-extrabold text-[#89A8B2]">${totalCompleted}/${totalSentences}</div>
+                        <div class="text-xs text-[#A0937D]">전체 완료 문장 (${overallPct}%)</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-extrabold text-[#89A8B2]">${passRate}%</div>
+                        <div class="text-xs text-[#A0937D]">발음 통과율 (총 ${data.summary.total_attempts}회 시도)</div>
+                    </div>
+                </div>
+                <p class="text-sm font-bold mb-2">패턴별 진도</p>
+                <div class="space-y-2 mb-4">
+            `;
+
+            data.byPattern.forEach(p => {
+                const pct = p.total_sentences ? Math.round((p.completed_sentences / p.total_sentences) * 100) : 0;
+                html += `
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>${p.icon} ${escapeHtml(p.pattern_text)}</span>
+                            <span class="text-[#A0937D]">${p.completed_sentences}/${p.total_sentences}</span>
+                        </div>
+                        <div class="w-full h-2 bg-[#F2EAE1] rounded-full overflow-hidden">
+                            <div class="h-full bg-[#89A8B2]" style="width:${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div><p class="text-sm font-bold mb-2">최근 학습 활동</p>`;
+            if (data.recent.length === 0) {
+                html += `<p class="text-sm text-[#A0937D]">아직 학습 기록이 없어요.</p>`;
+            } else {
+                html += `<div class="space-y-1">`;
+                data.recent.forEach(r => {
+                    const time = new Date(r.created_at).toLocaleString('ko-KR');
+                    const mark = r.is_pass ? '✅' : '❌';
+                    html += `<div class="text-xs text-[#A0937D]">${mark} ${escapeHtml(r.eng_text)} <span class="opacity-70">(${time})</span></div>`;
+                });
+                html += `</div>`;
+            }
+
+            body.innerHTML = html;
+        } catch (e) {
+            body.innerHTML = '<p class="text-center text-red-500 py-8">연결에 문제가 있어요.</p>';
+        }
+    }
+
+    function closeProgressModal() {
+        document.getElementById('progress-modal').classList.add('hidden');
+    }
+
     checkAdminSession();
 </script>
+    <!-- 학습 현황 모달 -->
+    <div id="progress-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+        <div class="card p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-extrabold text-lg" id="progress-modal-title">학습 현황</h3>
+                <button onclick="closeProgressModal()" class="text-[#A0937D] text-xl">✕</button>
+            </div>
+            <div id="progress-modal-body"></div>
+        </div>
+    </div>
+
 </body>
 </html>
