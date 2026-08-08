@@ -581,15 +581,14 @@
             }
 
             setTimeout(() => {
-                playTTS();
-                setTimeout(() => {
+                playTTS(() => {
                     isBusy = false;
                     if (recognitionSupported) {
                         updateStatusText("마이크를 누르고 따라 말해보세요!", "#8B7355");
                     } else {
                         updateStatusText("따라 말한 뒤 마이크 버튼을 눌러 '말했어요'를 체크해요!", "#8B7355");
                     }
-                }, 1500);
+                });
             }, 500);
         }
 
@@ -620,16 +619,38 @@
             document.getElementById('mic-btn').classList.add('clay-btn');
         }
 
-        function playTTS() {
-            if (!selectedPattern) return;
+        // onDone: 발음 재생이 "진짜로" 끝났을 때 호출되는 콜백입니다.
+        // (고정된 시간으로 어림짐작하지 않고, 실제 재생 종료 이벤트를 사용합니다)
+        function playTTS(onDone) {
+            if (!selectedPattern) {
+                if (onDone) onDone();
+                return;
+            }
             const text = selectedPattern.sentences[currentSentenceIndex].eng;
-            
+
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'en-US';
-            utterance.rate = 0.85; 
-            
+            utterance.rate = 0.85;
+
+            // 재생 중에는 마이크를 눌러도 반응하지 않도록 막습니다.
+            isBusy = true;
+
+            let finished = false;
+            const finish = () => {
+                if (finished) return;
+                finished = true;
+                isBusy = false; // 재생이 끝나면 항상 자동으로 마이크를 다시 활성화합니다.
+                if (onDone) onDone();
+            };
+
+            utterance.onend = finish;
+            utterance.onerror = finish;
+
             window.speechSynthesis.cancel();
             window.speechSynthesis.speak(utterance);
+
+            // 일부 브라우저에서 onend가 씹히는 경우를 대비한 안전장치 (최대 6초)
+            setTimeout(finish, 6000);
         }
 
         function updateStatusText(text, color) {
@@ -740,11 +761,10 @@
             if (repeatCount < REQUIRED_REPEATS) {
                 updateStatusText(`좋아요! (${repeatCount}/${REQUIRED_REPEATS}) 한 번 더 따라 말해볼까요?`, "#27AE60");
                 setTimeout(() => {
-                    playTTS();
-                    setTimeout(() => {
-                        updateStatusText("따라 말한 뒤 다시 버튼을 눌러주세요!", "#8B7355");
+                    playTTS(() => {
                         isBusy = false;
-                    }, 1200);
+                        updateStatusText("따라 말한 뒤 다시 버튼을 눌러주세요!", "#8B7355");
+                    });
                 }, 1000);
             } else {
                 updateStatusText("잘했어요! 이제 목소리를 녹음해서 저장해볼까요? 🎙️", "#2980B9");
@@ -894,16 +914,19 @@
                 // 성공 로직
                 repeatCount++;
                 updateLearningUI();
-                isBusy = false;
                 logAttempt(selectedPattern.sentences[currentSentenceIndex].id, true, transcript, confidence, repeatCount >= REQUIRED_REPEATS);
 
                 if (repeatCount < REQUIRED_REPEATS) {
+                    isBusy = true; // 다시 들려주는 동안 마이크 비활성 유지
                     updateStatusText("참 잘했어요! 완벽해요! 한 번 더 따라해볼까요?", "#27AE60");
                     setTimeout(() => {
-                        playTTS();
-                        setTimeout(() => updateStatusText("마이크를 누르고 다시 따라해봐요!", "#8B7355"), 1200);
+                        playTTS(() => {
+                            isBusy = false;
+                            updateStatusText("마이크를 누르고 다시 따라해봐요!", "#8B7355");
+                        });
                     }, 1200);
                 } else {
+                    isBusy = false; // 녹음 대기 상태 - 바로 누를 수 있어야 함
                     updateStatusText("최고예요! 이제 목소리를 녹음해서 저장해볼까요? 🎙️", "#2980B9");
                     const icon = document.getElementById('mic-icon');
                     const btn = document.getElementById('mic-btn');
@@ -913,15 +936,20 @@
                 }
             } else {
                 // 실패 로직 (사용자가 말한 내용을 텍스트로 보여주며 피드백)
-                isBusy = false;
                 logAttempt(selectedPattern.sentences[currentSentenceIndex].id, false, transcript, confidence, false);
                 updateStatusText(`아쉬워요! "${transcript}"라고 들렸어요. 다시 또박또박 말해볼까요?`, "#E74C3C");
-                setTimeout(() => {
-                    if (repeatCount < REQUIRED_REPEATS) {
-                        playTTS();
-                        setTimeout(() => updateStatusText("마이크를 누르고 다시 시도해봐요!", "#8B7355"), 1200);
-                    }
-                }, 2200);
+
+                if (repeatCount < REQUIRED_REPEATS) {
+                    isBusy = true; // 다시 들려주는 동안 마이크 비활성 유지
+                    setTimeout(() => {
+                        playTTS(() => {
+                            isBusy = false;
+                            updateStatusText("마이크를 누르고 다시 시도해봐요!", "#8B7355");
+                        });
+                    }, 2200);
+                } else {
+                    isBusy = false;
+                }
             }
         }
 
