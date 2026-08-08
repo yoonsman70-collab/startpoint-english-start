@@ -31,11 +31,12 @@
     .btn-danger:hover { background: #DB7A6A; }
     .btn-outline { background: white; border: 2px solid #D8C3A5; color: #8B7355; }
     .btn-outline:hover { background: #F2EAE1; }
-    input {
+    input, select {
         border: 2px solid #E4DACB;
         border-radius: 12px;
         padding: 10px 14px;
         outline: none;
+        background: white;
     }
     input:focus { border-color: #89A8B2; }
     .badge { border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 800; }
@@ -116,9 +117,17 @@
 
     <!-- 단어·패턴 관리 -->
     <div class="card p-6 mt-6">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="font-extrabold text-lg">단어·패턴 관리 <span class="text-sm text-[#A0937D] font-normal">(스타트 단계)</span></h2>
-            <button onclick="loadPatterns()" class="text-sm text-[#89A8B2] font-bold">↻ 새로고침</button>
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h2 class="font-extrabold text-lg">단어·패턴 관리</h2>
+            <div class="flex items-center gap-2">
+                <select id="level-select" onchange="onLevelChange()" class="text-sm font-bold">
+                    <option value="start">스타트</option>
+                    <option value="basic">베이직</option>
+                    <option value="intermediate">인터미디엇</option>
+                    <option value="advanced">어드밴스드</option>
+                </select>
+                <button onclick="loadPatterns()" class="text-sm text-[#89A8B2] font-bold">↻ 새로고침</button>
+            </div>
         </div>
 
         <div class="bg-[#F9F6F0] rounded-2xl p-4 mb-4">
@@ -358,9 +367,19 @@
     let patternsCache = [];
     const expandedPatterns = new Set();
 
+    function getCurrentLevel() {
+        const sel = document.getElementById('level-select');
+        return sel ? sel.value : 'start';
+    }
+
+    function onLevelChange() {
+        expandedPatterns.clear();
+        loadPatterns();
+    }
+
     async function loadPatterns() {
         try {
-            const res = await fetch('/api/patterns?level=start', { credentials: 'same-origin' });
+            const res = await fetch(`/api/patterns?level=${getCurrentLevel()}`, { credentials: 'same-origin' });
             const data = await res.json();
             if (!data.ok) return;
             patternsCache = data.patterns;
@@ -445,7 +464,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
-                body: JSON.stringify({ level_code: 'start', pattern_text, desc_text, icon })
+                body: JSON.stringify({ level_code: getCurrentLevel(), pattern_text, desc_text, icon })
             });
             const data = await res.json();
             if (!data.ok) {
@@ -573,15 +592,24 @@
         }
     }
 
+    let progressModalUserId = null;
+    let progressModalUserName = null;
+
     async function viewProgress(userId, name) {
+        progressModalUserId = userId;
+        progressModalUserName = name;
         const modal = document.getElementById('progress-modal');
-        const body = document.getElementById('progress-modal-body');
         document.getElementById('progress-modal-title').innerText = `${name} 학생의 학습 현황`;
-        body.innerHTML = '<p class="text-center text-[#A0937D] py-8">불러오는 중...</p>';
         modal.classList.remove('hidden');
+        await loadProgressData(getCurrentLevel());
+    }
+
+    async function loadProgressData(levelCode) {
+        const body = document.getElementById('progress-modal-body');
+        body.innerHTML = '<p class="text-center text-[#A0937D] py-8">불러오는 중...</p>';
 
         try {
-            const res = await fetch(`/api/admin/student-progress?user_id=${userId}`, { credentials: 'same-origin' });
+            const res = await fetch(`/api/admin/student-progress?user_id=${progressModalUserId}&level=${levelCode}`, { credentials: 'same-origin' });
             const data = await res.json();
             if (!data.ok) {
                 body.innerHTML = `<p class="text-center text-red-500 py-8">${escapeHtml(data.error || '불러오기에 실패했어요.')}</p>`;
@@ -596,6 +624,15 @@
                 : 0;
 
             let html = `
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-bold text-[#5E4B3C]">단계 선택</span>
+                    <select onchange="loadProgressData(this.value)" class="text-sm">
+                        <option value="start" ${levelCode === 'start' ? 'selected' : ''}>스타트</option>
+                        <option value="basic" ${levelCode === 'basic' ? 'selected' : ''}>베이직</option>
+                        <option value="intermediate" ${levelCode === 'intermediate' ? 'selected' : ''}>인터미디엇</option>
+                        <option value="advanced" ${levelCode === 'advanced' ? 'selected' : ''}>어드밴스드</option>
+                    </select>
+                </div>
                 <div class="bg-[#F9F6F0] rounded-2xl p-4 mb-4 flex gap-6">
                     <div>
                         <div class="text-2xl font-extrabold text-[#89A8B2]">${totalCompleted}/${totalSentences}</div>
@@ -624,6 +661,10 @@
                     </div>
                 `;
             });
+
+            if (data.byPattern.length === 0) {
+                html += `<p class="text-sm text-[#A0937D] py-2">이 단계에는 아직 등록된 패턴이 없어요.</p>`;
+            }
 
             html += `</div><p class="text-sm font-bold mb-2">최근 학습 활동</p>`;
             if (data.recent.length === 0) {

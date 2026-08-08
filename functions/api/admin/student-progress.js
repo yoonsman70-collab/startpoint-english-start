@@ -11,6 +11,7 @@ export async function onRequestGet(context) {
 
   const url = new URL(request.url);
   const userId = url.searchParams.get('user_id');
+  const levelCode = url.searchParams.get('level') || 'start';
   if (!userId) {
     return jsonResponse({ ok: false, error: 'user_id가 필요해요.' }, 400);
   }
@@ -23,10 +24,10 @@ export async function onRequestGet(context) {
      FROM patterns pt
      JOIN sentences s ON s.pattern_id = pt.id
      LEFT JOIN progress pr ON pr.sentence_id = s.id AND pr.user_id = ?
-     WHERE pt.level_id = (SELECT id FROM levels WHERE code = 'start')
+     WHERE pt.level_id = (SELECT id FROM levels WHERE code = ?)
      GROUP BY pt.id
      ORDER BY pt.sort_order ASC`
-  ).bind(userId).all();
+  ).bind(userId, levelCode).all();
 
   // 전체 시도 횟수 / 성공 횟수 (정확도 참고용)
   const summary = await db.prepare(
