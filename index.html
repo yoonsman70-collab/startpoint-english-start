@@ -376,6 +376,7 @@
         let activeStream = null;
         let isBusy = false; // 처리 중 중복 클릭 방지
         let phase = 'listen'; // 'listen' | 'checking' | 'recording'
+        let isAdvancing = false; // nextSentence()가 중복 호출되어 문장이 건너뛰지 않도록 막는 안전장치
 
         window.addEventListener('load', () => {
             if (isInAppBrowser()) {
@@ -563,6 +564,7 @@
             cleanupMicSessions();
             repeatCount = 0;
             phase = 'listen';
+            isAdvancing = false; // 새 문장이 시작됐으니 다음 이동을 다시 허용
             updateLearningUI();
 
             // 문장 진입 시 통계 데이터 초기 셋팅
@@ -954,6 +956,11 @@
         }
 
         function nextSentence() {
+            // 마이크를 여러 번 연타해서 이 함수가 짧은 시간 안에 두 번 불려도,
+            // 문장이 2개씩 건너뛰지 않도록 막는 안전장치입니다.
+            if (isAdvancing) return;
+            isAdvancing = true;
+
             currentSentenceIndex++;
             if (currentSentenceIndex < selectedPattern.sentences.length) {
                 loadSentence();
