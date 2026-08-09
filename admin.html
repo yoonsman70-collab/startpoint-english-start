@@ -143,9 +143,40 @@
 
         <div id="pattern-accordion" class="space-y-3"></div>
     </div>
+
+    <!-- 단어장 관리 -->
+    <div class="card p-6 mt-6">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h2 class="font-extrabold text-lg">단어장 관리</h2>
+            <div class="flex items-center gap-2">
+                <select id="vocab-level-select" onchange="onVocabLevelChange()" class="text-sm font-bold">
+                    <option value="elem_basic">초등영단어-마스터</option>
+                    <option value="mid_basic">중학영단어-기본</option>
+                    <option value="mid_essential">중학영단어-필수</option>
+                    <option value="mid_master">중학영단어-마스터</option>
+                </select>
+                <button onclick="loadVocabWords()" class="text-sm text-[#89A8B2] font-bold">↻ 새로고침</button>
+            </div>
+        </div>
+
+        <div class="bg-[#F9F6F0] rounded-2xl p-4 mb-4">
+            <p class="text-sm font-bold mb-2">새 단어 추가</p>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-2">
+                <input id="nw-day" type="number" min="1" placeholder="일차 (예: 1)">
+                <input id="nw-en" type="text" placeholder="영단어">
+                <input id="nw-ko" type="text" placeholder="뜻" class="sm:col-span-2">
+            </div>
+            <button onclick="createVocabWord()" class="btn btn-primary px-4 py-2 text-sm">단어 추가</button>
+            <span id="vocab-create-msg" class="text-sm font-bold ml-2"></span>
+        </div>
+
+        <div id="vocab-accordion" class="space-y-3"></div>
+        <p id="vocab-empty-msg" class="text-center text-[#A0937D] py-6 hidden">이 단계에는 아직 등록된 단어가 없어요.</p>
+    </div>
 </div>
 
 <script>
+
     let adminUser = null;
 
     async function checkAdminSession() {
@@ -687,6 +718,160 @@
 
     function closeProgressModal() {
         document.getElementById('progress-modal').classList.add('hidden');
+    }
+
+    // ==============================
+    // 단어장 관리
+    // ==============================
+    let vocabDaysCache = [];
+    const expandedVocabDays = new Set();
+
+    function getCurrentVocabLevel() {
+        const sel = document.getElementById('vocab-level-select');
+        return sel ? sel.value : 'elem_basic';
+    }
+
+    function onVocabLevelChange() {
+        expandedVocabDays.clear();
+        loadVocabWords();
+    }
+
+    async function loadVocabWords() {
+        const accordion = document.getElementById('vocab-accordion');
+        const emptyMsg = document.getElementById('vocab-empty-msg');
+        try {
+            const res = await fetch(`/api/vocab-words?level=${getCurrentVocabLevel()}`, { credentials: 'same-origin' });
+            const data = await res.json();
+            if (!data.ok) {
+                accordion.innerHTML = '';
+                emptyMsg.classList.remove('hidden');
+                emptyMsg.innerText = data.error || '아직 이 단계는 준비되지 않았어요.';
+                vocabDaysCache = [];
+                return;
+            }
+            vocabDaysCache = data.days || [];
+            emptyMsg.classList.toggle('hidden', vocabDaysCache.length > 0);
+            emptyMsg.innerText = '이 단계에는 아직 등록된 단어가 없어요.';
+            renderVocabAccordion();
+        } catch (e) {
+            console.error('단어 불러오기 실패:', e);
+        }
+    }
+
+    function renderVocabAccordion() {
+        const container = document.getElementById('vocab-accordion');
+        container.innerHTML = '';
+
+        vocabDaysCache.forEach(d => {
+            const isOpen = expandedVocabDays.has(d.day);
+            const wrap = document.createElement('div');
+            wrap.className = 'border border-[#F2EAE1] rounded-2xl overflow-hidden';
+
+            const wordRows = d.words.map(w => `
+                <div class="flex items-center justify-between gap-2 px-4 py-2 border-b border-[#F2EAE1] last:border-b-0">
+                    <div class="text-sm">
+                        <span class="font-bold">${escapeHtml(w.en)}</span>
+                        <span class="text-[#A0937D]"> — ${escapeHtml(w.ko)}</span>
+                    </div>
+                    <div class="flex gap-2 shrink-0">
+                        <button onclick="editVocabWord(${w.id}, '${escapeHtml(w.en).replace(/'/g, "\\'")}', '${escapeHtml(w.ko).replace(/'/g, "\\'")}')" class="btn btn-outline px-2 py-1 text-xs">수정</button>
+                        <button onclick="deleteVocabWord(${w.id})" class="btn btn-danger px-2 py-1 text-xs">삭제</button>
+                    </div>
+                </div>
+            `).join('');
+
+            wrap.innerHTML = `
+                <button onclick="toggleVocabDay(${d.day})" class="w-full flex items-center justify-between px-4 py-3 bg-[#F9F6F0] text-left">
+                    <div class="font-extrabold text-sm">Day ${d.day} <span class="text-xs text-[#A0937D] font-normal">· 단어 ${d.words.length}개</span></div>
+                    <span class="text-[#A0937D]">${isOpen ? '▲' : '▼'}</span>
+                </button>
+                <div class="${isOpen ? '' : 'hidden'}">${wordRows}</div>
+            `;
+            container.appendChild(wrap);
+        });
+    }
+
+    function toggleVocabDay(day) {
+        if (expandedVocabDays.has(day)) expandedVocabDays.delete(day);
+        else expandedVocabDays.add(day);
+        renderVocabAccordion();
+    }
+
+    async function createVocabWord() {
+        const day_number = parseInt(document.getElementById('nw-day').value, 10);
+        const en_text = document.getElementById('nw-en').value.trim();
+        const ko_text = document.getElementById('nw-ko').value.trim();
+        const msgEl = document.getElementById('vocab-create-msg');
+        msgEl.textContent = '';
+        msgEl.className = 'text-sm font-bold ml-2';
+
+        if (!day_number || !en_text || !ko_text) {
+            msgEl.textContent = '일차, 영단어, 뜻을 모두 입력해주세요.';
+            msgEl.classList.add('text-red-500');
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/admin/create-word', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ level_code: getCurrentVocabLevel(), day_number, en_text, ko_text })
+            });
+            const data = await res.json();
+            if (!data.ok) {
+                msgEl.textContent = data.error || '추가에 실패했어요.';
+                msgEl.classList.add('text-red-500');
+                return;
+            }
+            msgEl.textContent = '단어가 추가됐어요!';
+            msgEl.classList.add('text-green-600');
+            document.getElementById('nw-en').value = '';
+            document.getElementById('nw-ko').value = '';
+            expandedVocabDays.add(day_number);
+            loadVocabWords();
+        } catch (e) {
+            msgEl.textContent = '연결에 문제가 있어요.';
+            msgEl.classList.add('text-red-500');
+        }
+    }
+
+    async function editVocabWord(id, currentEn, currentKo) {
+        const en_text = prompt('영단어를 입력하세요:', currentEn);
+        if (en_text === null) return;
+        const ko_text = prompt('뜻을 입력하세요:', currentKo);
+        if (ko_text === null) return;
+
+        try {
+            const res = await fetch('/api/admin/update-word', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id, en_text, ko_text })
+            });
+            const data = await res.json();
+            if (data.ok) loadVocabWords();
+            else alert(data.error || '수정에 실패했어요.');
+        } catch (e) {
+            alert('연결에 문제가 있어요.');
+        }
+    }
+
+    async function deleteVocabWord(id) {
+        if (!confirm('이 단어를 삭제할까요?')) return;
+        try {
+            const res = await fetch('/api/admin/delete-word', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (data.ok) loadVocabWords();
+            else alert(data.error || '삭제에 실패했어요.');
+        } catch (e) {
+            alert('연결에 문제가 있어요.');
+        }
     }
 
     checkAdminSession();
