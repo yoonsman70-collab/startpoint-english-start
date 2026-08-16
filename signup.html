@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>시작점 AI 영어 - 회원가입</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Jua&display=swap');
+body {
+  font-family: 'Nunito', sans-serif;
+  background-color: #F9F6F0;
+  color: #5E4B3C;
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.brand-title { font-family: 'Jua', sans-serif; }
+.card {
+  background: #FFFFFF;
+  border-radius: 24px;
+  box-shadow: 0 4px 20px rgba(94, 75, 60, 0.1);
+}
+input {
+  border: 2px solid #E4DACB;
+  border-radius: 14px;
+  padding: 12px 16px;
+  outline: none;
+  background: white;
+  width: 100%;
+  font-size: 15px;
+}
+input:focus { border-color: #89A8B2; }
+.btn {
+  border-radius: 14px;
+  font-weight: 800;
+  transition: transform 0.1s;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: #89A8B2; color: white; }
+.btn-primary:disabled { background: #C9D6DA; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<div class="card p-8 w-full max-w-sm">
+  <h1 class="brand-title text-2xl text-center mb-1">시작점 AI 영어</h1>
+  <p class="text-center text-sm text-[#A0937D] mb-6">학생 회원가입 신청</p>
+
+  <div id="form-area" class="space-y-3">
+    <div>
+      <label class="text-xs font-bold text-[#A0937D] block mb-1">학생 이름</label>
+      <input id="su-name" type="text" placeholder="예: 김민준" maxlength="20">
+    </div>
+    <div>
+      <label class="text-xs font-bold text-[#A0937D] block mb-1">아이디 (영문+숫자, 8자 이내)</label>
+      <input id="su-username" type="text" placeholder="예: minjun01" maxlength="8" autocomplete="username">
+    </div>
+    <div>
+      <label class="text-xs font-bold text-[#A0937D] block mb-1">비밀번호 (4~12자)</label>
+      <input id="su-password" type="password" placeholder="비밀번호" maxlength="12" autocomplete="new-password">
+    </div>
+    <div>
+      <label class="text-xs font-bold text-[#A0937D] block mb-1">비밀번호 확인</label>
+      <input id="su-password-confirm" type="password" placeholder="비밀번호 다시 입력" maxlength="12" autocomplete="new-password"
+        onkeydown="if(event.key==='Enter') submitSignup()">
+    </div>
+
+    <p id="su-error" class="text-sm font-bold text-red-500 min-h-[20px] text-center"></p>
+
+    <button id="su-submit-btn" onclick="submitSignup()" class="btn btn-primary w-full py-3 mt-2">가입 신청하기</button>
+
+    <p class="text-xs text-center text-[#A0937D] mt-3 leading-relaxed">
+      가입 신청 후, 선생님이 승인하면 로그인할 수 있어요.<br>
+      아이디/비밀번호는 잊어버리지 않게 잘 기억해주세요!
+    </p>
+  </div>
+
+  <div id="success-area" class="hidden text-center py-6">
+    <div class="text-5xl mb-4">🎉</div>
+    <h2 class="font-extrabold text-lg mb-2">가입 신청 완료!</h2>
+    <p class="text-sm text-[#A0937D] leading-relaxed">선생님이 승인해주시면<br>바로 로그인해서 사용할 수 있어요.</p>
+  </div>
+</div>
+
+<script>
+async function submitSignup() {
+  const name = document.getElementById('su-name').value.trim();
+  const username = document.getElementById('su-username').value.trim();
+  const password = document.getElementById('su-password').value;
+  const confirmPw = document.getElementById('su-password-confirm').value;
+  const errorEl = document.getElementById('su-error');
+  const btn = document.getElementById('su-submit-btn');
+  errorEl.innerText = '';
+
+  if (!name || !username || !password || !confirmPw) {
+    errorEl.innerText = '모든 칸을 입력해주세요.';
+    return;
+  }
+  if (!/^[a-zA-Z0-9]+$/.test(username)) {
+    errorEl.innerText = '아이디는 영문과 숫자만 사용할 수 있어요.';
+    return;
+  }
+  if (password.length < 4) {
+    errorEl.innerText = '비밀번호는 4자 이상으로 입력해주세요.';
+    return;
+  }
+  if (password !== confirmPw) {
+    errorEl.innerText = '비밀번호가 서로 달라요. 다시 확인해주세요.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerText = '신청 중...';
+
+  try {
+    const res = await fetch('/api/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ display_name: name, username, password })
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      errorEl.innerText = data.error || '가입 신청에 실패했어요.';
+      btn.disabled = false;
+      btn.innerText = '가입 신청하기';
+      return;
+    }
+    document.getElementById('form-area').classList.add('hidden');
+    document.getElementById('success-area').classList.remove('hidden');
+  } catch (e) {
+    errorEl.innerText = '연결에 문제가 있어요. 잠시 후 다시 시도해주세요.';
+    btn.disabled = false;
+    btn.innerText = '가입 신청하기';
+  }
+}
+</script>
+</body>
+</html>

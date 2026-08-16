@@ -44,7 +44,7 @@ export async function getUserFromRequest(request, db) {
   if (new Date(session.expires_at) < new Date()) return null;
 
   const user = await db.prepare(
-    'SELECT id, username, display_name, class_name, role, is_locked FROM users WHERE id = ?'
+    'SELECT id, username, display_name, class_name, role, is_locked, must_change_password FROM users WHERE id = ?'
   ).bind(session.user_id).first();
 
   return user || null;
