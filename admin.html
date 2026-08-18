@@ -644,6 +644,7 @@
 
     let progressModalUserId = null;
     let progressModalUserName = null;
+    let currentProgressTab = 'speaking';
 
     async function viewProgress(userId, name) {
         progressModalUserId = userId;
@@ -651,7 +652,113 @@
         const modal = document.getElementById('progress-modal');
         document.getElementById('progress-modal-title').innerText = `${name} 학생의 학습 현황`;
         modal.classList.remove('hidden');
-        await loadProgressData(getCurrentLevel());
+        switchProgressTab('speaking');
+    }
+
+    function switchProgressTab(tab) {
+        currentProgressTab = tab;
+        const speakingBtn = document.getElementById('progress-tab-speaking');
+        const vocabBtn = document.getElementById('progress-tab-vocab');
+        speakingBtn.style.background = tab === 'speaking' ? 'var(--primary, #89A8B2)' : 'transparent';
+        speakingBtn.style.color = tab === 'speaking' ? '#fff' : '#5E4B3C';
+        vocabBtn.style.background = tab === 'vocab' ? 'var(--primary, #89A8B2)' : 'transparent';
+        vocabBtn.style.color = tab === 'vocab' ? '#fff' : '#5E4B3C';
+
+        if (tab === 'speaking') {
+            loadProgressData(getCurrentLevel());
+        } else {
+            loadVocabProgressData('elem_basic');
+        }
+    }
+
+    // ==============================
+    // 단어장(보카) 학습 현황
+    // ==============================
+    const VOCAB_PROGRESS_LEVELS = [
+        { code: 'elem_basic', label: '초등영단어 마스터' },
+        { code: 'mid_basic', label: '중학영단어 기본' },
+        { code: 'mid_essential', label: '중학영단어 필수' },
+        { code: 'mid_master', label: '중학영단어 마스터' }
+    ];
+
+    async function loadVocabProgressData(levelCode) {
+        const body = document.getElementById('progress-modal-body');
+        body.innerHTML = '<p class="text-center text-[#A0937D] py-8">불러오는 중...</p>';
+
+        try {
+            const res = await fetch(`/api/admin/student-vocab-progress?user_id=${progressModalUserId}&level=${levelCode}`, { credentials: 'same-origin' });
+            const data = await res.json();
+            if (!data.ok) {
+                body.innerHTML = `<p class="text-center text-red-500 py-8">${escapeHtml(data.error || '불러오기에 실패했어요.')}</p>`;
+                return;
+            }
+
+            const totalWords = data.byDay.reduce((sum, d) => sum + d.total_words, 0);
+            const totalCompleted = data.byDay.reduce((sum, d) => sum + d.completed_words, 0);
+            const overallPct = totalWords ? Math.round((totalCompleted / totalWords) * 100) : 0;
+            const passRate = data.summary.total_attempts
+                ? Math.round((data.summary.pass_attempts / data.summary.total_attempts) * 100)
+                : 0;
+
+            const options = VOCAB_PROGRESS_LEVELS.map(l =>
+                `<option value="${l.code}" ${levelCode === l.code ? 'selected' : ''}>${l.label}</option>`
+            ).join('');
+
+            let html = `
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-bold text-[#5E4B3C]">단계 선택</span>
+                    <select onchange="loadVocabProgressData(this.value)" class="text-sm">${options}</select>
+                </div>
+                <div class="bg-[#F9F6F0] rounded-2xl p-4 mb-4 flex gap-6">
+                    <div>
+                        <div class="text-2xl font-extrabold text-[#89A8B2]">${totalCompleted}/${totalWords}</div>
+                        <div class="text-xs text-[#A0937D]">전체 완료 단어 (${overallPct}%)</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-extrabold text-[#89A8B2]">${passRate}%</div>
+                        <div class="text-xs text-[#A0937D]">정답률 (총 ${data.summary.total_attempts}회 시도)</div>
+                    </div>
+                </div>
+                <p class="text-sm font-bold mb-2">일차(Day)별 진도</p>
+                <div class="space-y-2 mb-4">
+            `;
+
+            data.byDay.forEach(d => {
+                const pct = d.total_words ? Math.round((d.completed_words / d.total_words) * 100) : 0;
+                html += `
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>Day ${d.day_number}</span>
+                            <span class="text-[#A0937D]">${d.completed_words}/${d.total_words}</span>
+                        </div>
+                        <div class="w-full h-2 bg-[#F2EAE1] rounded-full overflow-hidden">
+                            <div class="h-full bg-[#89A8B2]" style="width:${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (data.byDay.length === 0) {
+                html += `<p class="text-sm text-[#A0937D] py-2">이 단계에는 아직 등록된 단어가 없어요.</p>`;
+            }
+
+            html += `</div><p class="text-sm font-bold mb-2">최근 학습 활동</p>`;
+            if (data.recent.length === 0) {
+                html += `<p class="text-sm text-[#A0937D]">아직 학습 기록이 없어요.</p>`;
+            } else {
+                html += `<div class="space-y-1">`;
+                data.recent.forEach(r => {
+                    const time = new Date(r.created_at).toLocaleString('ko-KR');
+                    const mark = r.is_pass ? '✅' : '❌';
+                    html += `<div class="text-xs text-[#A0937D]">${mark} ${escapeHtml(r.en_text)} (${escapeHtml(r.ko_text)}) <span class="opacity-70">(${time})</span></div>`;
+                });
+                html += `</div>`;
+            }
+
+            body.innerHTML = html;
+        } catch (e) {
+            body.innerHTML = '<p class="text-center text-red-500 py-8">연결에 문제가 있어요.</p>';
+        }
     }
 
     async function loadProgressData(levelCode) {
@@ -901,6 +1008,10 @@
             <div class="flex items-center justify-between mb-4">
                 <h3 class="font-extrabold text-lg" id="progress-modal-title">학습 현황</h3>
                 <button onclick="closeProgressModal()" class="text-[#A0937D] text-xl">✕</button>
+            </div>
+            <div class="flex gap-2 mb-4 bg-[#F9F6F0] p-1 rounded-2xl">
+                <button id="progress-tab-speaking" onclick="switchProgressTab('speaking')" class="flex-1 py-2 rounded-xl text-sm font-extrabold">🗣️ 말하기</button>
+                <button id="progress-tab-vocab" onclick="switchProgressTab('vocab')" class="flex-1 py-2 rounded-xl text-sm font-extrabold">📚 단어장</button>
             </div>
             <div id="progress-modal-body"></div>
         </div>
