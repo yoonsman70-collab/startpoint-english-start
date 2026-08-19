@@ -27,11 +27,6 @@ export async function onRequestPost(context) {
     return jsonResponse({ ok: false, error: '아이디 또는 비밀번호가 올바르지 않아요.' }, 401);
   }
 
-  // 회원가입 후 아직 관리자 승인을 받지 못한 계정은 로그인을 막습니다.
-  if (user.is_approved === 0) {
-    return jsonResponse({ ok: false, error: '아직 선생님(관리자) 승인 대기중이에요. 조금만 기다려주세요!', pending: true }, 403);
-  }
-
   if (user.is_locked) {
     return jsonResponse({ ok: false, error: '계정이 잠겼어요. 선생님(관리자)에게 문의해주세요.', locked: true }, 403);
   }
@@ -79,8 +74,7 @@ export async function onRequestPost(context) {
         username: user.username,
         display_name: user.display_name,
         role: user.role,
-        class_name: user.class_name,
-        must_change_password: !!user.must_change_password
+        class_name: user.class_name
       }
     },
     200,

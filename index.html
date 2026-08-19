@@ -168,20 +168,16 @@
                 <h2 class="text-xl font-extrabold text-[#5E4B3C] mb-1">로그인해서 시작해요!</h2>
                 <p class="text-sm text-[#A0937D] mb-6">비비와 함께 영어 공부하러 가요</p>
                 <div class="w-full max-w-xs space-y-3">
-                    <input id="login-username" type="text" placeholder="아이디" autocomplete="username" maxlength="8"
+                    <input id="login-username" type="text" placeholder="아이디" autocomplete="username"
                         onkeydown="if(event.key==='Enter') document.getElementById('login-password').focus()"
                         class="w-full px-4 py-3 rounded-2xl clay-card border-2 border-white text-[#5E4B3C] font-bold text-center focus:outline-none">
-                    <input id="login-password" type="password" placeholder="비밀번호" autocomplete="current-password" maxlength="12"
+                    <input id="login-password" type="password" placeholder="비밀번호" autocomplete="current-password"
                         onkeydown="if(event.key==='Enter') handleLogin()"
                         class="w-full px-4 py-3 rounded-2xl clay-card border-2 border-white text-[#5E4B3C] font-bold text-center focus:outline-none">
                     <button id="login-btn" onclick="handleLogin()"
                         class="w-full clay-btn-blue py-3 rounded-2xl font-extrabold text-white transition-transform active:scale-95">
                         로그인
                     </button>
-                    <a href="signup.html" target="_blank" rel="noopener"
-                        class="block w-full text-center py-2 text-sm font-bold text-[#89A8B2] underline underline-offset-2">
-                        아직 계정이 없으신가요? 회원가입
-                    </a>
                     <p id="login-error" class="text-center text-sm font-bold text-red-500 min-h-[20px]"></p>
                 </div>
                 <p class="text-xs text-[#A0937D] mt-6 text-center leading-relaxed">아이디와 비밀번호는<br>선생님(원장님)께 받아주세요!</p>
@@ -360,7 +356,19 @@
         }
 
         const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognitionSupported = !!SpeechRecognitionAPI;
+        // 아이폰/아이패드에서 "홈 화면에 추가"된 상태(설치된 앱)로 실행 중인지 확인합니다.
+        // iOS는 사파리 탭에서는 음성 인식이 잘 되지만, 설치된 앱(standalone) 모드에서는
+        // 음성 인식 세션이 계속 끊기는(aborted) 제약이 있는 것으로 확인되어,
+        // 이 경우엔 자동 인식 대신 안전한 셀프 체크 모드로 바로 전환합니다.
+        function isIOSStandalone() {
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const isStandalone = window.navigator.standalone === true ||
+                window.matchMedia('(display-mode: standalone)').matches;
+            return isIOS && isStandalone;
+        }
+
+        const recognitionSupported = !!SpeechRecognitionAPI && !isIOSStandalone();
         const mediaSupported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
 
         function getSupportedMimeType() {
@@ -569,6 +577,7 @@
             repeatCount = 0;
             phase = 'listen';
             isAdvancing = false; // 새 문장이 시작됐으니 다음 이동을 다시 허용
+            autoRetryDone = false;
             updateLearningUI();
 
             // 문장 진입 시 통계 데이터 초기 셋팅
@@ -583,7 +592,7 @@
             if (recognitionSupported) {
                 updateStatusText("먼저 비비의 발음을 잘 들어보세요!", "#A07855");
             } else {
-                updateStatusText("이 브라우저는 자동 발음 체크를 지원하지 않아요. 듣고 따라 말해보자!", "#A07855");
+                updateStatusText("이 기기에서는 듣고 따라 말하는 방식으로 진행해요!", "#A07855");
             }
 
             setTimeout(() => {
@@ -694,6 +703,10 @@
         // ------------------------------
         // (A) 발음 체크: 인식(recognition)만 단독으로 사용, 녹음 절대 안 함
         // ------------------------------
+        // aborted 에러가 나면(대부분 일시적 끊김) 학생을 귀찮게 하지 않고
+        // 조용히 한 번만 자동으로 다시 시도합니다.
+        let autoRetryDone = false;
+
         function startRecognitionCheck() {
             isBusy = true;
             const icon = document.getElementById('mic-icon');
@@ -714,6 +727,7 @@
                     const transcript = event.results[0][0].transcript;
                     const confidence = event.results[0][0].confidence;
                     console.log("인식된 문장:", transcript, "/ 신뢰도:", confidence);
+                    autoRetryDone = false;
                     stopPulse();
                     checkPronunciation(transcript, confidence);
                 };
@@ -721,6 +735,18 @@
                 recognition.onerror = (event) => {
                     console.error("음성 인식 에러:", event.error);
                     stopPulse();
+
+                    // aborted는 대부분 일시적인 끊김입니다. 한 번은 조용히 자동 재시도합니다.
+                    if (event.error === 'aborted' && !autoRetryDone) {
+                        autoRetryDone = true;
+                        setTimeout(() => {
+                            isBusy = false;
+                            startRecognitionCheck();
+                        }, 400);
+                        return;
+                    }
+                    autoRetryDone = false;
+
                     isBusy = false;
                     if (event.error === 'no-speech') {
                         updateStatusText("목소리가 안 들렸어요! 다시 눌러서 크게 말해볼까요?", "#E74C3C");
@@ -728,6 +754,8 @@
                         updateStatusText("마이크 권한이 없어요. 브라우저 설정에서 허용해주세요! (not-allowed)", "#E74C3C");
                     } else if (event.error === 'audio-capture') {
                         updateStatusText("마이크를 찾을 수 없어요. 다른 앱이 마이크를 쓰고 있는지 확인해주세요.", "#E74C3C");
+                    } else if (event.error === 'aborted') {
+                        updateStatusText("마이크가 자꾸 끊겨요. 마이크 버튼을 다시 눌러주세요! (aborted)", "#E74C3C");
                     } else {
                         updateStatusText(`잘 못 들었어요. 버튼을 다시 눌러주세요. (${event.error})`, "#E74C3C");
                     }
