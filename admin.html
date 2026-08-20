@@ -55,8 +55,8 @@
         <h1 class="brand-title text-2xl text-center mb-1">시작점 AI 영어</h1>
         <p class="text-center text-sm text-[#A0937D] mb-6">관리자 로그인</p>
         <div class="space-y-3">
-            <input id="admin-username" type="text" placeholder="관리자 아이디" class="w-full" autocomplete="username">
-            <input id="admin-password" type="password" placeholder="비밀번호" class="w-full" autocomplete="current-password"
+            <input id="admin-username" type="text" placeholder="관리자 아이디" maxlength="8" class="w-full" autocomplete="username">
+            <input id="admin-password" type="password" placeholder="비밀번호" maxlength="12" class="w-full" autocomplete="current-password"
                 onkeydown="if(event.key==='Enter') adminLogin()">
             <button onclick="adminLogin()" class="btn btn-primary w-full py-3">로그인</button>
             <p id="login-error" class="text-center text-sm font-bold text-red-500 min-h-[20px]"></p>
@@ -71,7 +71,20 @@
             <h1 class="brand-title text-2xl">시작점 AI 영어 - 관리자</h1>
             <p class="text-sm text-[#A0937D]" id="admin-welcome"></p>
         </div>
-        <button onclick="adminLogout()" class="btn btn-outline px-4 py-2 text-sm">로그아웃</button>
+        <div class="flex items-center gap-2">
+            <button onclick="openChangePasswordModal(false)" class="btn btn-outline px-4 py-2 text-sm">비밀번호 변경</button>
+            <button onclick="adminLogout()" class="btn btn-outline px-4 py-2 text-sm">로그아웃</button>
+        </div>
+    </div>
+
+    <!-- 회원가입 승인 대기 -->
+    <div class="card p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-extrabold text-lg">회원가입 승인 대기 <span id="pending-count-badge" class="badge badge-locked"></span></h2>
+            <button onclick="loadPending()" class="text-sm text-[#89A8B2] font-bold">↻ 새로고침</button>
+        </div>
+        <div id="pending-list" class="space-y-2"></div>
+        <p id="pending-empty" class="text-center text-[#A0937D] py-6 hidden">승인 대기중인 가입 신청이 없어요.</p>
     </div>
 
     <!-- 학생 추가 폼 -->
@@ -150,7 +163,8 @@
             <h2 class="font-extrabold text-lg">단어장 관리</h2>
             <div class="flex items-center gap-2">
                 <select id="vocab-level-select" onchange="onVocabLevelChange()" class="text-sm font-bold">
-                    <option value="elem_basic">초등영단어-마스터</option>
+                    <option value="elem_basic">초등영단어-기본</option>
+                    <option value="elem_master">초등영단어-마스터</option>
                     <option value="mid_basic">중학영단어-기본</option>
                     <option value="mid_essential">중학영단어-필수</option>
                     <option value="mid_master">중학영단어-마스터</option>
@@ -205,6 +219,12 @@
         document.getElementById('admin-welcome').innerText = `${adminUser.display_name}님, 환영합니다`;
         loadUsers();
         loadPatterns();
+        loadPending();
+
+        // 최초 로그인이라 비밀번호를 아직 안 바꿨다면, 강제로 변경 화면을 띄웁니다.
+        if (adminUser.must_change_password) {
+            openChangePasswordModal(true);
+        }
     }
 
     async function adminLogin() {
@@ -625,6 +645,7 @@
 
     let progressModalUserId = null;
     let progressModalUserName = null;
+    let currentProgressTab = 'speaking';
 
     async function viewProgress(userId, name) {
         progressModalUserId = userId;
@@ -632,7 +653,114 @@
         const modal = document.getElementById('progress-modal');
         document.getElementById('progress-modal-title').innerText = `${name} 학생의 학습 현황`;
         modal.classList.remove('hidden');
-        await loadProgressData(getCurrentLevel());
+        switchProgressTab('speaking');
+    }
+
+    function switchProgressTab(tab) {
+        currentProgressTab = tab;
+        const speakingBtn = document.getElementById('progress-tab-speaking');
+        const vocabBtn = document.getElementById('progress-tab-vocab');
+        speakingBtn.style.background = tab === 'speaking' ? 'var(--primary, #89A8B2)' : 'transparent';
+        speakingBtn.style.color = tab === 'speaking' ? '#fff' : '#5E4B3C';
+        vocabBtn.style.background = tab === 'vocab' ? 'var(--primary, #89A8B2)' : 'transparent';
+        vocabBtn.style.color = tab === 'vocab' ? '#fff' : '#5E4B3C';
+
+        if (tab === 'speaking') {
+            loadProgressData(getCurrentLevel());
+        } else {
+            loadVocabProgressData('elem_basic');
+        }
+    }
+
+    // ==============================
+    // 단어장(보카) 학습 현황
+    // ==============================
+    const VOCAB_PROGRESS_LEVELS = [
+        { code: 'elem_basic', label: '초등영단어 기본' },
+        { code: 'elem_master', label: '초등영단어 마스터' },
+        { code: 'mid_basic', label: '중학영단어 기본' },
+        { code: 'mid_essential', label: '중학영단어 필수' },
+        { code: 'mid_master', label: '중학영단어 마스터' }
+    ];
+
+    async function loadVocabProgressData(levelCode) {
+        const body = document.getElementById('progress-modal-body');
+        body.innerHTML = '<p class="text-center text-[#A0937D] py-8">불러오는 중...</p>';
+
+        try {
+            const res = await fetch(`/api/admin/student-vocab-progress?user_id=${progressModalUserId}&level=${levelCode}`, { credentials: 'same-origin' });
+            const data = await res.json();
+            if (!data.ok) {
+                body.innerHTML = `<p class="text-center text-red-500 py-8">${escapeHtml(data.error || '불러오기에 실패했어요.')}</p>`;
+                return;
+            }
+
+            const totalWords = data.byDay.reduce((sum, d) => sum + d.total_words, 0);
+            const totalCompleted = data.byDay.reduce((sum, d) => sum + d.completed_words, 0);
+            const overallPct = totalWords ? Math.round((totalCompleted / totalWords) * 100) : 0;
+            const passRate = data.summary.total_attempts
+                ? Math.round((data.summary.pass_attempts / data.summary.total_attempts) * 100)
+                : 0;
+
+            const options = VOCAB_PROGRESS_LEVELS.map(l =>
+                `<option value="${l.code}" ${levelCode === l.code ? 'selected' : ''}>${l.label}</option>`
+            ).join('');
+
+            let html = `
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-bold text-[#5E4B3C]">단계 선택</span>
+                    <select onchange="loadVocabProgressData(this.value)" class="text-sm">${options}</select>
+                </div>
+                <div class="bg-[#F9F6F0] rounded-2xl p-4 mb-4 flex gap-6">
+                    <div>
+                        <div class="text-2xl font-extrabold text-[#89A8B2]">${totalCompleted}/${totalWords}</div>
+                        <div class="text-xs text-[#A0937D]">전체 완료 단어 (${overallPct}%)</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-extrabold text-[#89A8B2]">${passRate}%</div>
+                        <div class="text-xs text-[#A0937D]">정답률 (총 ${data.summary.total_attempts}회 시도)</div>
+                    </div>
+                </div>
+                <p class="text-sm font-bold mb-2">일차(Day)별 진도</p>
+                <div class="space-y-2 mb-4">
+            `;
+
+            data.byDay.forEach(d => {
+                const pct = d.total_words ? Math.round((d.completed_words / d.total_words) * 100) : 0;
+                html += `
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span>Day ${d.day_number}</span>
+                            <span class="text-[#A0937D]">${d.completed_words}/${d.total_words}</span>
+                        </div>
+                        <div class="w-full h-2 bg-[#F2EAE1] rounded-full overflow-hidden">
+                            <div class="h-full bg-[#89A8B2]" style="width:${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (data.byDay.length === 0) {
+                html += `<p class="text-sm text-[#A0937D] py-2">이 단계에는 아직 등록된 단어가 없어요.</p>`;
+            }
+
+            html += `</div><p class="text-sm font-bold mb-2">최근 학습 활동</p>`;
+            if (data.recent.length === 0) {
+                html += `<p class="text-sm text-[#A0937D]">아직 학습 기록이 없어요.</p>`;
+            } else {
+                html += `<div class="space-y-1">`;
+                data.recent.forEach(r => {
+                    const time = new Date(r.created_at).toLocaleString('ko-KR');
+                    const mark = r.is_pass ? '✅' : '❌';
+                    html += `<div class="text-xs text-[#A0937D]">${mark} ${escapeHtml(r.en_text)} (${escapeHtml(r.ko_text)}) <span class="opacity-70">(${time})</span></div>`;
+                });
+                html += `</div>`;
+            }
+
+            body.innerHTML = html;
+        } catch (e) {
+            body.innerHTML = '<p class="text-center text-red-500 py-8">연결에 문제가 있어요.</p>';
+        }
     }
 
     async function loadProgressData(levelCode) {
@@ -883,9 +1011,177 @@
                 <h3 class="font-extrabold text-lg" id="progress-modal-title">학습 현황</h3>
                 <button onclick="closeProgressModal()" class="text-[#A0937D] text-xl">✕</button>
             </div>
+            <div class="flex gap-2 mb-4 bg-[#F9F6F0] p-1 rounded-2xl">
+                <button id="progress-tab-speaking" onclick="switchProgressTab('speaking')" class="flex-1 py-2 rounded-xl text-sm font-extrabold">🗣️ 말하기</button>
+                <button id="progress-tab-vocab" onclick="switchProgressTab('vocab')" class="flex-1 py-2 rounded-xl text-sm font-extrabold">📚 단어장</button>
+            </div>
             <div id="progress-modal-body"></div>
         </div>
     </div>
+
+    <!-- 비밀번호 변경 모달 -->
+    <div id="change-password-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+        <div class="card p-6 w-full max-w-sm">
+            <h3 class="font-extrabold text-lg mb-1" id="cp-title">비밀번호 변경</h3>
+            <p class="text-sm text-[#A0937D] mb-4" id="cp-subtitle">현재 비밀번호와 새 비밀번호를 입력해주세요.</p>
+            <div class="space-y-3">
+                <input id="cp-current" type="password" placeholder="현재 비밀번호" maxlength="12" class="w-full" autocomplete="current-password">
+                <input id="cp-new" type="password" placeholder="새 비밀번호 (4~12자)" maxlength="12" class="w-full" autocomplete="new-password">
+                <input id="cp-confirm" type="password" placeholder="새 비밀번호 확인" maxlength="12" class="w-full" autocomplete="new-password">
+                <p id="cp-error" class="text-sm font-bold text-red-500 min-h-[20px]"></p>
+                <div class="flex gap-2">
+                    <button id="cp-cancel-btn" onclick="closeChangePasswordModal()" class="btn btn-outline flex-1 py-2.5">취소</button>
+                    <button onclick="submitChangePassword()" class="btn btn-primary flex-1 py-2.5">변경하기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // ==============================
+    // 회원가입 승인 대기 관리
+    // ==============================
+    async function loadPending() {
+        const listEl = document.getElementById('pending-list');
+        const emptyEl = document.getElementById('pending-empty');
+        const badgeEl = document.getElementById('pending-count-badge');
+        try {
+            const res = await fetch('/api/admin/list-pending', { credentials: 'same-origin' });
+            const data = await res.json();
+            if (!data.ok) return;
+
+            const pending = data.pending || [];
+            badgeEl.innerText = pending.length > 0 ? `${pending.length}건` : '';
+            badgeEl.style.display = pending.length > 0 ? 'inline-block' : 'none';
+            emptyEl.classList.toggle('hidden', pending.length > 0);
+
+            listEl.innerHTML = pending.map(p => `
+                <div class="flex items-center justify-between gap-3 px-4 py-3 bg-[#F9F6F0] rounded-2xl">
+                    <div>
+                        <div class="font-extrabold text-sm">${escapeHtml(p.display_name)} <span class="text-[#A0937D] font-normal">(${escapeHtml(p.username)})</span></div>
+                        <div class="text-xs text-[#A0937D]">${new Date(p.created_at).toLocaleString('ko-KR')} 신청</div>
+                    </div>
+                    <div class="flex gap-2 shrink-0">
+                        <button onclick="approvePending(${p.id})" class="btn btn-primary px-3 py-1.5 text-xs">승인</button>
+                        <button onclick="rejectPending(${p.id})" class="btn btn-danger px-3 py-1.5 text-xs">거절</button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.error('승인 대기 목록 불러오기 실패:', e);
+        }
+    }
+
+    async function approvePending(id) {
+        const class_name = prompt('반 이름을 입력해주세요 (선택, 그냥 확인을 눌러도 돼요):', '') || null;
+        try {
+            const res = await fetch('/api/admin/approve-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id, class_name })
+            });
+            const data = await res.json();
+            if (!data.ok) { alert(data.error || '승인에 실패했어요.'); return; }
+            loadPending();
+            loadUsers();
+        } catch (e) {
+            alert('연결에 문제가 있어요.');
+        }
+    }
+
+    async function rejectPending(id) {
+        if (!confirm('이 가입 신청을 거절할까요? (기록이 삭제됩니다)')) return;
+        try {
+            const res = await fetch('/api/admin/reject-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (!data.ok) { alert(data.error || '거절에 실패했어요.'); return; }
+            loadPending();
+        } catch (e) {
+            alert('연결에 문제가 있어요.');
+        }
+    }
+
+    // ==============================
+    // 비밀번호 변경 (본인 계정)
+    // ==============================
+    let isForcedPasswordChange = false;
+
+    function openChangePasswordModal(forced) {
+        isForcedPasswordChange = !!forced;
+        document.getElementById('cp-current').value = '';
+        document.getElementById('cp-new').value = '';
+        document.getElementById('cp-confirm').value = '';
+        document.getElementById('cp-error').innerText = '';
+
+        const currentField = document.getElementById('cp-current');
+        const cancelBtn = document.getElementById('cp-cancel-btn');
+        const subtitle = document.getElementById('cp-subtitle');
+
+        if (forced) {
+            // 최초 로그인 강제 변경: 현재 비밀번호 입력 불필요, 취소도 불가능(꼭 바꿔야 함)
+            currentField.classList.add('hidden');
+            cancelBtn.classList.add('hidden');
+            subtitle.innerText = '처음 로그인하셨네요! 보안을 위해 새 비밀번호로 변경해주세요.';
+        } else {
+            currentField.classList.remove('hidden');
+            cancelBtn.classList.remove('hidden');
+            subtitle.innerText = '현재 비밀번호와 새 비밀번호를 입력해주세요.';
+        }
+
+        document.getElementById('change-password-modal').classList.remove('hidden');
+    }
+
+    function closeChangePasswordModal() {
+        if (isForcedPasswordChange) return; // 강제 변경 중에는 닫기 불가
+        document.getElementById('change-password-modal').classList.add('hidden');
+    }
+
+    async function submitChangePassword() {
+        const current_password = document.getElementById('cp-current').value;
+        const new_password = document.getElementById('cp-new').value;
+        const confirm_password = document.getElementById('cp-confirm').value;
+        const errorEl = document.getElementById('cp-error');
+        errorEl.innerText = '';
+
+        if (!isForcedPasswordChange && !current_password) {
+            errorEl.innerText = '현재 비밀번호를 입력해주세요.';
+            return;
+        }
+        if (new_password.length < 4 || new_password.length > 12) {
+            errorEl.innerText = '새 비밀번호는 4~12자로 입력해주세요.';
+            return;
+        }
+        if (new_password !== confirm_password) {
+            errorEl.innerText = '새 비밀번호가 서로 달라요. 다시 확인해주세요.';
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ current_password, new_password })
+            });
+            const data = await res.json();
+            if (!data.ok) {
+                errorEl.innerText = data.error || '변경에 실패했어요.';
+                return;
+            }
+            isForcedPasswordChange = false;
+            document.getElementById('change-password-modal').classList.add('hidden');
+            alert('비밀번호가 변경됐어요!');
+        } catch (e) {
+            errorEl.innerText = '연결에 문제가 있어요.';
+        }
+    }
+</script>
 
 </body>
 </html>
